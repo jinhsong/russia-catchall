@@ -599,16 +599,13 @@ function buildClassify(){
     c.innerHTML = `
       <div class="head"><span class="mname">${esc(L.model)}</span>${badge('info','신규 판정')}</div>
       <div class="body">
-        <div class="row">
-          <div class="col"><label class="fld req">물품명</label><input type="text" id="cl-item-${id}"></div>
-          <div class="col"><label class="fld">HS코드 추천받기 (키워드)</label>
-            <div class="row"><div class="col"><input type="text" id="cl-kw-${id}" placeholder="예: 센서, 통신, 제어"></div>
-            <div style="flex:0 0 auto"><button class="btn sm" data-rec="${id}">추천</button></div></div>
-          </div>
+        <div><label class="fld req">물품명</label>
+          <input type="text" id="cl-item-${id}" placeholder="예: 스마트폰, 태블릿 등">
+          <div class="hint">물품명을 입력하면 아래에 추천 HS코드가 표시됩니다.</div>
+          <div class="chips" id="cl-recwrap-${id}"></div>
         </div>
-        <div class="chips" id="cl-recwrap-${id}"></div>
         <div style="margin-top:12px"><label class="fld req">HS코드 (한국 수출기준)</label>
-          <input type="text" id="cl-hs-${id}" placeholder="추천 칩 선택 또는 직접 입력">
+          <input type="text" id="cl-hs-${id}" placeholder="추천 HS 클릭 또는 직접 입력">
           <div id="cl-hsnote-${id}" style="margin-top:8px"></div>
         </div>
         <div class="row" style="margin-top:12px">
@@ -620,20 +617,28 @@ function buildClassify(){
       </div>`;
     body.appendChild(c);
   });
-  $$('button[data-rec]', body).forEach(b=>b.addEventListener('click',()=>recommendHS(b.dataset.rec)));
+  $$('input[id^="cl-item-"]', body).forEach(inp=>{
+    const id=inp.id.replace('cl-item-','');
+    inp.addEventListener('input', ()=>{ recommendHS(id); markHsNote(id); });
+  });
   $$('input[id^="cl-hs-"]', body).forEach(inp=>inp.addEventListener('input', ()=>markHsNote(inp.id.replace('cl-hs-',''))));
 }
-function recommendHS(id){
-  const kw = $('#cl-kw-'+id).value.trim();
-  const item = $('#cl-item-'+id).value.trim();
-  const q = (kw+' '+item).toLowerCase();
-  const wrap = $('#cl-recwrap-'+id); wrap.innerHTML='';
-  const matches = DB.keywordHs.filter(r=>{
+// 물품명에 매칭되는 키워드-HS 행
+function recMatches(item){
+  const q=String(item||'').trim().toLowerCase();
+  if(!q) return [];
+  return DB.keywordHs.filter(r=>{
     const k=F.keyword(r).toLowerCase(); const d=F.desc(r).toLowerCase();
-    return k && (q.includes(k) || (kw && k.includes(kw.toLowerCase())) || (d && q && d.split(/\s+/).some(w=>w&&q.includes(w))));
+    return k && (q.includes(k) || k.includes(q) || (d && d.split(/\s+/).some(w=>w&&q.includes(w))));
   });
+}
+function recommendHS(id){
+  const wrap = $('#cl-recwrap-'+id); if(!wrap) return; wrap.innerHTML='';
+  const item = $('#cl-item-'+id).value.trim();
+  if(!item) return;
+  const matches = recMatches(item);
   if(!matches.length){
-    wrap.innerHTML = `<span class="badge warn"><span class="pip"></span>매칭되는 추천 HS가 없습니다 — 위험 점검(STEP 4) 대상</span>`;
+    wrap.innerHTML = `<span class="badge warn" style="margin-top:8px"><span class="pip"></span>추천 HS 없음 — HS 직접 입력 후 위험 점검(STEP 4) 진행</span>`;
     return;
   }
   const seen=new Set();
@@ -646,11 +651,8 @@ function recommendHS(id){
   });
 }
 function recListFor(id){
-  const kw = $('#cl-kw-'+id) ? $('#cl-kw-'+id).value.trim() : '';
   const item = $('#cl-item-'+id) ? $('#cl-item-'+id).value.trim() : '';
-  const q=(kw+' '+item).toLowerCase();
-  return DB.keywordHs.filter(r=>{ const k=F.keyword(r).toLowerCase();
-    return k && (q.includes(k)||(kw&&k.includes(kw.toLowerCase()))); }).map(r=>F.hs(r));
+  return [...new Set(recMatches(item).map(r=>F.hs(r)))];
 }
 function markHsNote(id){
   const hs=$('#cl-hs-'+id).value.trim();
