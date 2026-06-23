@@ -486,6 +486,23 @@ function bindCopyText(root){
   }));
 }
 
+/* 접근성: label.fld ↔ 입력 컨트롤 for/id 연결 (동적 렌더 후 호출, 중복 안전) */
+let _lblSeq=0;
+function associateLabels(root){
+  root=root||document;
+  root.querySelectorAll('label.fld:not([data-assoc])').forEach(lab=>{
+    lab.setAttribute('data-assoc','1');
+    let ctrl=null, el=lab.nextElementSibling;
+    while(el && !ctrl){
+      if(/^(INPUT|SELECT|TEXTAREA)$/.test(el.tagName)) ctrl=el;
+      else if(el.querySelector) ctrl=el.querySelector('input,select,textarea');
+      el=el.nextElementSibling;
+    }
+    if(!ctrl && lab.parentElement) ctrl=lab.parentElement.querySelector('input,select,textarea');
+    if(ctrl){ if(!ctrl.id) ctrl.id='fld-'+(++_lblSeq); lab.setAttribute('for', ctrl.id); }
+  });
+}
+
 /* =====================================================================
    DB / 양식 로드
    ===================================================================== */
@@ -720,6 +737,7 @@ function buildClassify(){
     inp.value=inp.value.replace(/[^0-9]/g,'').slice(0,10); inp.dataset.src='직접입력';
     markHsNote(inp.id.replace('cl-hs-',''));
   }));
+  associateLabels($('#card-classify'));
 }
 // 거래자 정보(수입국/수입자) 입력 UI
 function buildTrader(){
@@ -871,6 +889,7 @@ function renderClassifyDoc(){
      <textarea class="docedit" id="form-cl-body" rows="14">${esc(d.body)}</textarea>
      <div class="toolbar" style="margin-top:6px"><button class="btn sm" data-copytext="cl-body">본문 복사</button></div>`;
   bindCopyText($('#classify-doc-out'));
+  associateLabels($('#classify-doc-out'));
   $('#form-cl-title').addEventListener('input', e=>{ state.classifyDoc.title=e.target.value; });
   $('#form-cl-body').addEventListener('input', e=>{ state.classifyDoc.body=e.target.value; });
   $('#btn-copy-all').addEventListener('click', e=>copyText($('#form-cl-title').value+'\n\n'+$('#form-cl-body').value, e.currentTarget));
@@ -933,6 +952,7 @@ function buildScreen(){
     const cb=lab.querySelector('input');
     cb.addEventListener('change',()=>lab.classList.toggle('checked',cb.checked));
   });
+  associateLabels($('#card-screen'));
 }
 
 $('#btn-screen-next').addEventListener('click', ()=>{
@@ -983,6 +1003,7 @@ function renderInvoices(){
   const host=$('#pn-invoices');
   host.innerHTML = state.preInvoices.map((inv,iv)=>invoiceCardHtml(inv,iv)).join('');
   bindInvoiceEvents(host);
+  associateLabels(host);
 }
 function invoiceCardHtml(inv,iv){
   return `<div class="mcard" style="margin-bottom:16px">
@@ -1169,8 +1190,8 @@ function reportHTML(){
       <tr><th>수입자</th><td>${esc(d.importers.join(', '))}</td></tr></table>
       <h4>품의 제목</h4><pre>${esc(d.title)}</pre>
       <h4>품목 정보</h4>
-      <table><tr><th>No.</th><th>HS코드</th><th>HS구분</th><th>제품명</th><th>모델명</th><th>사양 및 규격</th><th>용도</th></tr>
-      ${d.items.map((it,i)=>`<tr><td>${i+1}</td><td>${esc(it.hs)}</td><td>${esc(it.hsSource||'')}</td><td>${esc(it.item)}</td><td>${esc(it.model)}</td><td>${esc(it.specFull)}</td><td>${esc(it.purpose)}</td></tr>`).join('')}
+      <table class="cards"><tr><th>No.</th><th>HS코드</th><th>HS구분</th><th>제품명</th><th>모델명</th><th>사양 및 규격</th><th>용도</th></tr>
+      ${d.items.map((it,i)=>`<tr><td data-label="No.">${i+1}</td><td data-label="HS코드">${esc(it.hs)}</td><td data-label="HS구분">${esc(it.hsSource||'')}</td><td data-label="제품명">${esc(it.item)}</td><td data-label="모델명">${esc(it.model)}</td><td data-label="사양 및 규격">${esc(it.specFull)}</td><td data-label="용도">${esc(it.purpose)}</td></tr>`).join('')}
       </table>
       <h4>첨부</h4><ul style="margin:4px 0 0">${d.items.map((it,i)=>`<li>첨부 ${i+1}. ${i+1}번 품목 ${esc(it.model)} 사양서 파일</li>`).join('')}</ul>
       <h4>복사용 본문 (표 포함)</h4><pre>${esc(d.body)}</pre>
@@ -1191,8 +1212,8 @@ function reportHTML(){
         : `<table>${Object.entries(state.enduser.perModel||{}).map(([m,n])=>`<tr><th>${esc(m)}</th><td>${esc(n||'-')}</td></tr>`).join('')}</table>`
     }</div>`);
     parts.push(`<div class="box"><h3>상황허가 의심징후 (12가지) — 수출 1회 기준</h3>
-      <table><tr><th>#</th><th>항목</th><th>해당</th></tr>
-      ${INDICATORS.map((t,i)=>`<tr><td>${i+1}</td><td>${esc(t)}</td><td>${state.indicators[i]?'<b>해당</b>':'비해당'}</td></tr>`).join('')}
+      <table class="cards"><tr><th>#</th><th>항목</th><th>해당</th></tr>
+      ${INDICATORS.map((t,i)=>`<tr><td data-label="#">${i+1}</td><td data-label="항목">${esc(t)}</td><td data-label="해당">${state.indicators[i]?'<b>해당</b>':'비해당'}</td></tr>`).join('')}
       </table></div>`);
   }
 
@@ -1204,17 +1225,17 @@ function reportHTML(){
         const cand=modelCandidates(it.model)[it.candIdx];
         const item=cand?cand.item:it.item; const number=cand?cand.number:it.number;
         const total=(parseFloat(it.qty)||0)*(parseFloat(it.price)||0); sum+=total;
-        return `<tr><td>${esc(item||'-')}</td><td>${esc(it.model)}</td><td>${esc(number||'-')}</td><td>${esc(it.qty||'-')}</td><td>${it.price?fmtUSD(it.price):'-'}</td><td>${fmtUSD(total)}</td><td>${esc(it.paid||'-')}</td></tr>`;
+        return `<tr><td data-label="제품명">${esc(item||'-')}</td><td data-label="모델명">${esc(it.model)}</td><td data-label="판정발급번호">${esc(number||'-')}</td><td data-label="수량(EA)">${esc(it.qty||'-')}</td><td data-label="단가(USD)">${it.price?fmtUSD(it.price):'-'}</td><td data-label="총액(USD)">${fmtUSD(total)}</td><td data-label="유무상">${esc(it.paid||'-')}</td></tr>`;
       }).join('');
       parts.push(`<div class="box">
         <table>
         <tr><th>인보이스 번호</th><td>${esc(inv.no)}</td><th>최종사용자</th><td>${esc(inv.endUser)}</td></tr>
         <tr><th>최종사용용도</th><td colspan="3">${esc(inv.endUse||'-')}</td></tr></table>
         <h4>품목 (${inv.items.length})</h4>
-        <table><tr><th>제품명</th><th>모델명</th><th>판정발급번호</th><th>수량(EA)</th><th>단가(USD)</th><th>총액(USD)</th><th>유무상</th></tr>
+        <table class="cards"><tr><th>제품명</th><th>모델명</th><th>판정발급번호</th><th>수량(EA)</th><th>단가(USD)</th><th>총액(USD)</th><th>유무상</th></tr>
         ${rows}
-        <tr><th colspan="5" style="text-align:right">합계(USD)</th><td colspan="2"><b>${fmtUSD(sum)}</b></td></tr>
-        </table></div>`);
+        </table>
+        <p style="text-align:right;margin:6px 2px 0"><b>합계(USD): ${fmtUSD(sum)}</b></p></div>`);
     });
   }
 
@@ -1229,6 +1250,14 @@ function reportHTML(){
     th,td{border:1px solid #d9d2c2;padding:6px 8px;text-align:left} th{background:#f4f1e9;white-space:nowrap}
     pre{white-space:pre-wrap;background:#fff;border:1px solid #d9d2c2;border-left:3px solid #9a6a32;border-radius:0 8px 8px 0;padding:12px;font-size:12.5px}
     @media print{.box{break-inside:avoid}}
+    @media(max-width:600px){
+      table.cards{font-size:12.5px}
+      table.cards tr:first-child{display:none}
+      table.cards tr{display:block;border:1px solid #d9d2c2;border-radius:8px;margin:8px 0;padding:4px 10px;background:#fff}
+      table.cards td{display:flex;justify-content:space-between;gap:14px;border:none;border-bottom:1px dashed #e7e0cf;padding:7px 0;text-align:right}
+      table.cards td:last-child{border-bottom:none}
+      table.cards td::before{content:attr(data-label);font-weight:700;color:#6c6354;text-align:left;flex:0 0 40%}
+    }
   </style>`;
   return `<!DOCTYPE html><html lang="ko"><head><meta charset="UTF-8">
     <link href="https://fonts.googleapis.com/css2?family=Noto+Serif+KR:wght@600;700&display=swap" rel="stylesheet">
@@ -1353,6 +1382,7 @@ loadAll();
 renderDbStatus();
 renderModelPreview();
 setStep('#card-input');
+associateLabels(document);
 offerRestore();
 </script>
 </body>
