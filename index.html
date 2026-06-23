@@ -190,10 +190,11 @@ details.paste[open]>summary::before{content:"▾ "}
   <!-- ================= STEP 1 ================= -->
   <div class="card" id="card-input">
     <h2><span class="num">1</span>모델명 조회</h2>
-    <p class="sub">여러 모델은 쉼표·띄어쓰기·탭·줄바꿈 등 어떤 기호로 구분해도 각각 처리됩니다.</p>
+    <p class="sub">여러 개의 모델을 한 번에 조회할 수 있습니다. <b>한 줄에 하나씩</b> 또는 <b>쉼표( , )</b>로 구분하세요.</p>
     <div style="margin-top:16px">
-      <label class="fld req">모델명</label>
-      <textarea id="models" placeholder="예) SM-S928N, SM-S921N&#10;SM-A546N"></textarea>
+      <label class="fld req">모델명 <span class="badge info" style="margin-left:6px">여러 개 입력 가능</span></label>
+      <textarea id="models" rows="4" placeholder="예)&#10;SM-S928N&#10;SM-S921N&#10;SM-A546N&#10;(또는: SM-S928N, SM-S921N)"></textarea>
+      <div id="model-preview" class="hint" style="margin-top:8px"></div>
     </div>
     <div class="toolbar" style="margin-top:14px;margin-bottom:0">
       <button class="btn primary" id="btn-lookup">판정 정보 조회</button>
@@ -213,12 +214,6 @@ details.paste[open]>summary::before{content:"▾ "}
   <div class="card hide" id="card-classify">
     <h2><span class="num">3</span>판정 신청 (신규 판정 — 품의 작성)</h2>
     <p class="sub">판정 이력이 없는 모델은 판정 신청 품의가 필요합니다. 거래자·품목 정보를 입력하면 상신용 제목·본문을 생성합니다.</p>
-    <div class="note info"><span class="ic">i</span><span><b>안내</b>
-      <ul style="margin:6px 0 0;padding-left:18px">
-        <li>신청 품의 상신 시 아래 제목과 본문을 복사하여 사용하시기 바랍니다.</li>
-        <li>품의에는 신청 품목별 사양서 첨부가 필요합니다.</li>
-        <li>통상그룹(송진혁/강부현 프로) 합의 — 파트장 이상 결재로 진행해 주시기 바랍니다.</li>
-      </ul></span></div>
 
     <div class="divider"></div>
     <h3 class="serif" style="font-size:15px;margin-bottom:10px">1. 거래자 정보</h3>
@@ -494,14 +489,25 @@ $$('input[data-load]').forEach(inp=>{
 /* =====================================================================
    STEP 1 -> 2 : 모델명 조회
    ===================================================================== */
+// 모델명 파싱: 줄바꿈 / 쉼표 / 세미콜론 / 탭으로 구분 (띄어쓰기는 구분자 아님)
+function parseModelInput(raw){
+  return [...new Set((raw||'').split(/[,;\n\r\t]+/).map(s=>s.trim()).filter(Boolean))];
+}
+function renderModelPreview(){
+  const el=$('#model-preview'); if(!el) return;
+  const list=parseModelInput($('#models').value);
+  if(!list.length){ el.innerHTML='<span class="muted">입력한 모델이 여기에 표시됩니다. (한 줄에 하나씩 또는 쉼표로 구분)</span>'; return; }
+  el.innerHTML=`<span class="muted">인식된 모델 <b>${list.length}</b>개</span> `+
+    `<span class="chips" style="display:inline-flex;margin-top:6px">${list.map(m=>`<span class="chip" style="cursor:default">${esc(m)}</span>`).join('')}</span>`;
+}
+$('#models').addEventListener('input', renderModelPreview);
 $('#btn-reset').addEventListener('click', ()=>{
-  $('#models').value='';
+  $('#models').value=''; renderModelPreview();
   ['#card-results','#card-classify','#card-screen','#card-prenotif','#card-summary'].forEach(s=>$(s).classList.add('hide'));
   $('#card-input').scrollIntoView({behavior:'smooth',block:'start'});
 });
 $('#btn-lookup').addEventListener('click', ()=>{
-  const raw = $('#models').value || '';
-  const models = [...new Set(raw.split(/[\s,;\t\n]+/).map(s=>s.trim()).filter(Boolean))];
+  const models = parseModelInput($('#models').value);
   if(!models.length){ alert('모델명을 1개 이상 입력하세요.'); return; }
   const tooShort = models.filter(m=>m.length<3);
   if(tooShort.length){ alert('모델명은 3글자 이상 입력하세요: '+tooShort.join(', ')); return; }
@@ -660,7 +666,6 @@ function buildTrader(){
     <div id="imp-russia" class="hide" style="margin-bottom:8px">
       <label class="chk"><input type="checkbox" class="imp" value="SERC"> SERC</label>
       <label class="chk"><input type="checkbox" class="imp" value="SRR"> SRR</label>
-      <div class="hint">SERC / SRR 는 러시아 선택 시 선택할 수 있습니다.</div>
     </div>
     <input type="text" id="imp-etc" placeholder="기타 수입자 (여러 곳이면 쉼표로 구분)">`;
   $$('#trader-body .chk input').forEach(cb=>cb.addEventListener('change',()=>cb.closest('.chk').classList.toggle('on',cb.checked)));
@@ -766,8 +771,16 @@ ${attachLines}`;
 
   state.classifyDoc = { countries, importers, items, title, body };
 
+  const guide =
+    `<div class="note danger" style="border-left-width:5px;background:var(--red-bg)"><span class="ic">!</span><span>
+       <b style="font-size:14px">📌 상신 전 반드시 확인하세요</b>
+       <ul style="margin:8px 0 0;padding-left:18px;font-weight:600">
+         <li>신청 품의 상신 시 아래 <b>제목과 본문을 복사</b>하여 사용하시기 바랍니다.</li>
+         <li>품의에는 <b>신청 품목별 사양서 첨부</b>가 필요합니다.</li>
+         <li><b>통상그룹(송진혁/강부현 프로) 합의</b> 후 <b>파트장 이상 결재</b>로 진행해 주시기 바랍니다.</li>
+       </ul></span></div>`;
   $('#classify-doc-out').innerHTML =
-    `<div class="divider"></div>
+    `<div class="divider"></div>${guide}
      <label class="fld">제목</label>${formBlock(title,'cl-title')}
      <label class="fld" style="margin-top:6px">본문</label>${formBlock(body,'cl-body')}`;
   bindCopy($('#classify-doc-out'));
@@ -1093,6 +1106,7 @@ function scrollTo_(sel){ $(sel).scrollIntoView({behavior:'smooth',block:'start'}
 /* 시작 */
 loadAll();
 renderDbStatus();
+renderModelPreview();
 </script>
 </body>
 </html>
