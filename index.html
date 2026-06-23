@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-<title>수출 판정·사전신고 점검 도구</title>
+<title>상황허가 판정·사전신고 점검 도구</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Noto+Serif+KR:wght@500;600;700&display=swap" rel="stylesheet">
@@ -161,8 +161,8 @@ details.paste[open]>summary::before{content:"▾ "}
   <div class="top-inner">
     <div class="seal serif">수출</div>
     <div>
-      <h1>수출 판정·사전신고 점검 도구</h1>
-      <div class="sub">EXPORT CONTROL · SELF-CHECK</div>
+      <h1>상황허가 판정·사전신고 점검 도구</h1>
+      <div class="sub">CATCH-ALL CONTROL · SELF-CHECK</div>
     </div>
   </div>
 </header>
@@ -170,9 +170,9 @@ details.paste[open]>summary::before{content:"▾ "}
 <div class="wrap">
 
   <div class="hero">
-    <div class="eyebrow">전략물자 자가점검</div>
-    <h2 class="serif">모델 판정·사전신고 확인</h2>
-    <p>모델명을 입력하면 판정 정보를 확인하고, 만료·미판정·해당 여부에 따라 재판정·판정신청·사전신고 절차를 안내합니다. 마지막에 결과 보고서를 내려받아 담당자에게 제출하세요.</p>
+    <div class="eyebrow">상황허가 대상품목 자가점검</div>
+    <h2 class="serif">모델 상황허가 판정·사전신고 확인</h2>
+    <p>모델명을 입력하면 상황허가 대상품목 판정 정보를 확인하고, 만료·미판정·해당 여부에 따라 재판정·판정신청·사전신고 절차를 안내합니다. 마지막에 결과 보고서를 내려받아 담당자에게 제출하세요.</p>
   </div>
 
   <!-- ================= DB 상태 ================= -->
@@ -203,10 +203,6 @@ details.paste[open]>summary::before{content:"▾ "}
     <h2><span class="num">1</span>모델명 조회</h2>
     <p class="sub">여러 모델은 쉼표·띄어쓰기·탭·줄바꿈 등 어떤 기호로 구분해도 각각 처리됩니다.</p>
     <div style="margin-top:16px">
-      <label class="fld">신청자 / 회사명 (선택)</label>
-      <input type="text" id="applicant" placeholder="예: 홍길동 / ○○전자">
-    </div>
-    <div style="margin-top:12px">
       <label class="fld req">모델명</label>
       <textarea id="models" placeholder="예) SM-DEMO-100, SM-DEMO-200&#10;ABC-1000"></textarea>
     </div>
@@ -281,7 +277,7 @@ details.paste[open]>summary::before{content:"▾ "}
     </div>
   </div>
 
-  <div class="footer">사내 수출 판정·사전신고 점검 보조 도구 · 최종 책임은 수출 담당 부서의 검토에 따릅니다.</div>
+  <div class="footer">사내 상황허가 판정·사전신고 점검 보조 도구 · 최종 책임은 수출 담당 부서의 검토에 따릅니다.</div>
 </div>
 
 <script>
@@ -328,7 +324,7 @@ const FORMS = { reclassification:'', classification:'', prenotification:'' };
 const dbLoaded = { self:false, expert:false, keywordHs:false, sanctions:false, prenotif:false };
 
 const state = {
-  applicant:'', models:[], lookups:[], classify:{},
+  models:[], lookups:[], classify:{},
   enduser:{ name:'', country:'', business:'', sameForAll:true, perModel:{} },
   indicators:[], sanctionsHits:[], prenotifModels:[],
   prenotif:{ buyer:'',consignee:'',enduser:'', rows:[] },
@@ -413,7 +409,7 @@ $$('input[data-load]').forEach(inp=>{
    STEP 1 -> 2 : 모델명 조회
    ===================================================================== */
 $('#btn-reset').addEventListener('click', ()=>{
-  $('#models').value=''; $('#applicant').value='';
+  $('#models').value='';
   ['#card-results','#card-classify','#card-screen','#card-prenotif','#card-summary'].forEach(s=>$(s).classList.add('hide'));
   $('#card-input').scrollIntoView({behavior:'smooth',block:'start'});
 });
@@ -421,7 +417,6 @@ $('#btn-lookup').addEventListener('click', ()=>{
   const raw = $('#models').value || '';
   const models = [...new Set(raw.split(/[\s,;\t\n]+/).map(s=>s.trim()).filter(Boolean))];
   if(!models.length){ alert('모델명을 1개 이상 입력하세요.'); return; }
-  state.applicant = $('#applicant').value.trim();
   state.models = models;
   state.lookups = models.map(lookupModel);
   renderResults();
@@ -437,7 +432,7 @@ function lookupModel(model){
   const expiry = F.expiry(hit);
   const expired = expiry && expiry < today();
   return { model, found:true, type, result:F.result(hit), number:F.number(hit),
-           expiry, item:F.item(hit), expired:!!expired };
+           expiry, item:F.item(hit), hs:F.hs(hit), expired:!!expired };
 }
 
 function renderResults(){
@@ -474,11 +469,13 @@ function renderResults(){
 }
 function kvBlock(L){
   return `<dl class="kv" style="margin-bottom:12px">
-    <dt>판정종류</dt><dd>${esc(L.type)}</dd>
+    <dt>모델명</dt><dd>${esc(L.model)}</dd>
+    <dt>제품명</dt><dd>${esc(L.item||'-')}</dd>
+    <dt>HS코드</dt><dd class="mono">${esc(L.hs||'-')}</dd>
+    <dt>판정구분</dt><dd>${esc(L.type)}</dd>
     <dt>판정결과</dt><dd>${esc(L.result)}</dd>
     <dt>판정번호</dt><dd class="mono">${esc(L.number||'-')}</dd>
-    <dt>유효기한</dt><dd>${esc(L.expiry||'-')}</dd>
-    ${L.item?`<dt>품목명</dt><dd>${esc(L.item)}</dd>`:''}</dl>`;
+    <dt>유효기한</dt><dd>${esc(L.expiry||'-')}</dd></dl>`;
 }
 
 /* =====================================================================
@@ -728,22 +725,22 @@ function fallbackCopy(text,done){
    ===================================================================== */
 function buildSummary(){
   $('#summary-body').innerHTML = note('ok','✓','아래 버튼으로 보고서를 다운로드하세요. 입력하신 모든 내용과 자동 채워진 양식이 포함됩니다.')+
-    `<p class="hint" style="margin-top:8px">신청자: ${esc(state.applicant||'-')} · 생성일: ${today()} · 모델 ${state.models.length}개</p>`;
+    `<p class="hint" style="margin-top:8px">생성일: ${today()} · 모델 ${state.models.length}개</p>`;
 }
 
 function reportHTML(){
   const parts=[];
-  parts.push(`<h1>수출 판정 · 사전신고 점검 결과 보고서</h1>`);
-  parts.push(`<p class="meta">신청자/회사명: <b>${esc(state.applicant||'-')}</b> · 작성일: <b>${today()}</b> · 본 결과는 담당자 제출용입니다.</p>`);
+  parts.push(`<h1>상황허가 판정 · 사전신고 점검 결과 보고서</h1>`);
+  parts.push(`<p class="meta">작성일: <b>${today()}</b> · 본 결과는 담당자 제출용입니다.</p>`);
 
   parts.push(`<h2>1. 모델별 판정정보 조회 결과</h2>`);
   state.lookups.forEach(L=>{
     if(!L.found){ parts.push(`<div class="box"><h3>${esc(L.model)} — 판정정보 없음 (판정 필요)</h3></div>`); return; }
     parts.push(`<div class="box"><h3>${esc(L.model)} — ${L.expired?'만료됨 (재판정 필요)':'유효'}</h3>
       <table>
-      <tr><th>판정종류</th><td>${esc(L.type)}</td><th>판정결과</th><td>${esc(L.result)}</td></tr>
+      <tr><th>제품명</th><td>${esc(L.item||'-')}</td><th>HS코드</th><td>${esc(L.hs||'-')}</td></tr>
+      <tr><th>판정구분</th><td>${esc(L.type)}</td><th>판정결과</th><td>${esc(L.result)}</td></tr>
       <tr><th>판정번호</th><td>${esc(L.number||'-')}</td><th>유효기한</th><td>${esc(L.expiry||'-')}</td></tr>
-      ${L.item?`<tr><th>품목명</th><td colspan="3">${esc(L.item)}</td></tr>`:''}
       </table>
       ${L.expired?`<h4>재판정 요청서</h4><pre>${esc(fillForm(FORMS.reclassification||defaultReclassForm(),{
         '판정번호':L.number,'모델명':L.model,'품목명':L.item,'판정종류':L.type,
@@ -823,7 +820,7 @@ function reportHTML(){
   </style>`;
   return `<!DOCTYPE html><html lang="ko"><head><meta charset="UTF-8">
     <link href="https://fonts.googleapis.com/css2?family=Noto+Serif+KR:wght@600;700&display=swap" rel="stylesheet">
-    <title>수출 판정·사전신고 점검 결과 보고서</title>${style}</head><body>${parts.join('\n')}
+    <title>상황허가 판정·사전신고 점검 결과 보고서</title>${style}</head><body>${parts.join('\n')}
     <p style="color:#6c6354;font-size:12px;margin-top:30px">본 보고서는 점검 보조용이며 최종 책임은 수출 담당 부서 검토에 따릅니다.</p>
     </body></html>`;
 }
@@ -832,9 +829,8 @@ $('#btn-download').addEventListener('click', ()=>{
   const html=reportHTML();
   const blob=new Blob([html],{type:'text/html;charset=utf-8'});
   const a=document.createElement('a');
-  const safe=(state.applicant||'수출점검').replace(/[^\w가-힣]+/g,'_');
   a.href=URL.createObjectURL(blob);
-  a.download=`수출점검결과_${safe}_${today()}.html`;
+  a.download=`상황허가점검결과_${today()}.html`;
   document.body.appendChild(a); a.click(); document.body.removeChild(a);
   setTimeout(()=>URL.revokeObjectURL(a.href),2000);
   $('#save-hint').textContent='저장되었습니다. 다운로드 파일을 제출하세요.';
