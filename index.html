@@ -199,7 +199,8 @@ details.paste[open]>summary::before{content:"▾ "}
     <button data-card="#card-classify">3 판정신청</button>
     <button data-card="#card-screen">4 위험점검</button>
     <button data-card="#card-prenotif">5 사전신고</button>
-    <button data-card="#card-summary">6 보고서</button>
+    <button data-card="#card-exception">6 허가예외</button>
+    <button data-card="#card-summary">7 보고서</button>
   </nav>
 </header>
 
@@ -283,7 +284,15 @@ details.paste[open]>summary::before{content:"▾ "}
     <div class="toolbar" style="margin-bottom:0"><button class="btn primary" id="btn-prenotif-save">사전신고 내용 저장 · 결과 보고서로 이동</button></div>
   </div>
 
-  <!-- ================= STEP 6 ================= -->
+  <!-- ================= 허가예외 검토 ================= -->
+  <div class="card hide" id="card-exception">
+    <h2><span class="num">예</span>허가예외 검토 (해당 · 사전신고 비대상)</h2>
+    <p class="sub">상황허가 대상(해당)이나 사전신고 대상 HS가 아닌 품목입니다. 개별수출허가 또는 허가예외 적용 가능 여부를 검토하세요.</p>
+    <div id="exception-body" style="margin-top:14px"></div>
+    <div class="toolbar" style="margin-top:14px;margin-bottom:0"><button class="btn primary" id="btn-exc-summary">결과 보고서로 이동</button></div>
+  </div>
+
+  <!-- ================= STEP 7 ================= -->
   <div class="card hide" id="card-summary">
     <h2><span class="num">★</span>결과 보고서 다운로드 (제출용)</h2>
     <p class="sub">아래 내용으로 보고서를 생성합니다. 내려받아 담당자에게 제출하세요.</p>
@@ -655,35 +664,50 @@ function renderResults(){
             '판정결과':L.result,'유효기한':L.expiry,'오늘':today()
         }), 're-'+cssId(L.model))}</div>`;
     } else if(L.isHae){
-      c.innerHTML = `<div class="head"><span class="mname">${esc(L.model)}</span>${badge('warn','유효 · 해당')}</div>
-        <div class="body">${kvBlock(L)}${note('warn','!',`판정결과가 <b>해당</b>입니다. 유효기한: <b>${esc(L.expiry||'-')}</b> · 대러 제재대상/사전신고 대상 여부를 아래 단계에서 점검하세요.`)}</div>`;
+      if(hsIsPrenotif(L.hs)){
+        c.innerHTML = `<div class="head"><span class="mname">${esc(L.model)}</span>${badge('warn','유효 · 해당 (사전신고 대상)')}</div>
+          <div class="body">${kvBlock(L)}${note('warn','!',`판정결과 <b>해당</b> · HS가 <b>사전신고 대상</b>입니다. 아래 <b>사전신고</b>를 진행하세요. 유효기한: <b>${esc(L.expiry||'-')}</b>`)}</div>`;
+      } else {
+        c.innerHTML = `<div class="head"><span class="mname">${esc(L.model)}</span>${badge('danger','유효 · 해당 (허가예외 검토)')}</div>
+          <div class="body">${kvBlock(L)}${note('danger','!',`판정결과 <b>해당</b>이나 HS가 <b>사전신고 대상이 아닙니다</b>. <b>허가예외 적용 가능 여부</b>를 검토하세요. 유효기한: <b>${esc(L.expiry||'-')}</b>`)}</div>`;
+      }
     } else {
       c.innerHTML = `<div class="head"><span class="mname">${esc(L.model)}</span>${badge('ok','유효 · 비해당')}</div>
-        <div class="body">${kvBlock(L)}${note('ok','✓',`유효한 판정(비해당)입니다. 유효기한: <b>${esc(L.expiry||'-')}</b> · 추가 조치가 필요하지 않습니다.`)}</div>`;
+        <div class="body">${kvBlock(L)}${note('ok','✓',`<b>비해당</b> — 사전신고 불필요. 상황허가 <b>위험 점검(의심징후)</b> 대상입니다. 유효기한: <b>${esc(L.expiry||'-')}</b>`)}</div>`;
     }
     body.appendChild(c);
   });
   const needClassify = state.lookups.filter(L=>!L.found);
-  const foundHae = state.lookups.filter(L=>L.found && !L.expired && L.isHae);
+  const validFound = state.lookups.filter(L=>L.found && !L.expired);
+  const bihae   = validFound.filter(L=>!L.isHae);
+  const haePre  = validFound.filter(L=>L.isHae && hsIsPrenotif(L.hs));
+  const haeExc  = validFound.filter(L=>L.isHae && !hsIsPrenotif(L.hs));
+
   const nx = $('#results-next');
-  const btns=[];
-  if(needClassify.length) btns.push(`<button class="btn primary" id="btn-to-classify">판정 신청 작성 (${needClassify.length}개 모델)</button>`);
-  if(foundHae.length) btns.push(`<button class="btn" id="btn-to-screen">위험 점검 (해당 ${foundHae.length}개)</button>`);
-  btns.push(`<button class="btn${needClassify.length?'':' primary'}" id="btn-to-prenotif">사전신고 진행하기</button>`);
-  btns.push(`<button class="btn ghost" id="btn-to-summary">결과 보고서</button>`);
+  const btns=[]; let primaryUsed=false;
+  const P=()=>{ if(primaryUsed) return ''; primaryUsed=true; return ' primary'; };
+  if(needClassify.length) btns.push(`<button class="btn${P()}" id="btn-to-classify">판정 신청 작성 (${needClassify.length})</button>`);
+  if(bihae.length)  btns.push(`<button class="btn${P()}" id="btn-to-screen">위험 점검 · 비해당 (${bihae.length})</button>`);
+  if(haePre.length) btns.push(`<button class="btn${P()}" id="btn-to-prenotif">사전신고 · 해당 (${haePre.length})</button>`);
+  else if(needClassify.length) btns.push(`<button class="btn" id="btn-to-prenotif">사전신고 진행하기</button>`);
+  if(haeExc.length) btns.push(`<button class="btn${P()}" id="btn-to-exception">허가예외 검토 · 해당 (${haeExc.length})</button>`);
+  btns.push(`<button class="btn${P()} ghost" id="btn-to-summary">결과 보고서</button>`);
   if(needClassify.length) btns.push(`<div class="hint" style="flex-basis:100%;margin-top:4px">※ 판정 DB는 실시간이 아닙니다. 이미 판정된 품목이라면 <b>‘사전신고 진행하기’</b>로 진행하세요.</div>`);
   nx.innerHTML = btns.join('');
+  const seed = haePre.length ? haePre.map(L=>L.model) : state.models;
   const on=(id,fn)=>{ const b=$('#'+id); if(b) b.addEventListener('click',fn); };
-  on('btn-to-classify', ()=>{ buildClassify(); show('#card-classify'); scrollTo_('#card-classify'); });
-  on('btn-to-screen',   ()=>{ buildScreen();   show('#card-screen');   scrollTo_('#card-screen'); });
-  on('btn-to-prenotif', ()=>{ buildPrenotif(); show('#card-prenotif'); scrollTo_('#card-prenotif'); });
-  on('btn-to-summary',  ()=>{ buildSummary();  show('#card-summary');  scrollTo_('#card-summary'); });
+  on('btn-to-classify',  ()=>{ buildClassify(); show('#card-classify'); scrollTo_('#card-classify'); });
+  on('btn-to-screen',    ()=>{ buildScreen();   show('#card-screen');   scrollTo_('#card-screen'); });
+  on('btn-to-prenotif',  ()=>{ buildPrenotif(seed); show('#card-prenotif'); scrollTo_('#card-prenotif'); });
+  on('btn-to-exception', ()=>{ buildException(); show('#card-exception'); scrollTo_('#card-exception'); });
+  on('btn-to-summary',   ()=>{ buildSummary();  show('#card-summary');  scrollTo_('#card-summary'); });
   bindCopy(body);
 }
-// 위험 점검/사전신고 대상: 유효한 '해당' 모델만. (신규 판정건은 STEP 3 품의로 별도 처리)
+function hsIsPrenotif(hs){ return DB.prenotif.some(r=>hsMatch(hs, F.hs(r))); }
+// 위험 점검 대상: 유효한 '비해당' 모델 (상황허가 의심징후 점검)
 function controlItems(){
   return state.lookups
-    .filter(L=>L.found && !L.expired && L.isHae)
+    .filter(L=>L.found && !L.expired && !L.isHae)
     .map(L=>({model:L.model, hs:L.hs, number:L.number, item:L.item, source:'found', noHsMatch:false}));
 }
 function kvBlock(L){
@@ -894,40 +918,44 @@ function renderClassifyDoc(){
   $('#form-cl-body').addEventListener('input', e=>{ state.classifyDoc.body=e.target.value; });
   $('#btn-copy-all').addEventListener('click', e=>copyText($('#form-cl-title').value+'\n\n'+$('#form-cl-body').value, e.currentTarget));
 
-  const foundHae = state.lookups.filter(L=>L.found && !L.expired && L.isHae);
-  const nx=$('#classify-next'); nx.innerHTML='';
-  if(foundHae.length){
-    nx.innerHTML = `<button class="btn" id="btn-cl-screen">유효 '해당' 모델 위험 점검 (${foundHae.length})</button>
-                    <button class="btn primary" id="btn-cl-summary">결과 보고서로 이동</button>`;
-    $('#btn-cl-screen').addEventListener('click', ()=>{ buildScreen(); show('#card-screen'); scrollTo_('#card-screen'); });
-  } else {
-    nx.innerHTML = `<button class="btn primary" id="btn-cl-summary">결과 보고서로 이동</button>`;
-  }
-  $('#btn-cl-summary').addEventListener('click', ()=>{ buildSummary(); show('#card-summary'); scrollTo_('#card-summary'); });
+  const vf=state.lookups.filter(L=>L.found && !L.expired);
+  const bihae=vf.filter(L=>!L.isHae), haePre=vf.filter(L=>L.isHae&&hsIsPrenotif(L.hs)), haeExc=vf.filter(L=>L.isHae&&!hsIsPrenotif(L.hs));
+  const nx=$('#classify-next'); const b=[];
+  if(bihae.length)  b.push(`<button class="btn" id="btn-cl-screen">위험 점검 · 비해당 (${bihae.length})</button>`);
+  if(haePre.length) b.push(`<button class="btn" id="btn-cl-pre">사전신고 · 해당 (${haePre.length})</button>`);
+  if(haeExc.length) b.push(`<button class="btn" id="btn-cl-exc">허가예외 검토 · 해당 (${haeExc.length})</button>`);
+  b.push(`<button class="btn primary" id="btn-cl-summary">결과 보고서로 이동</button>`);
+  nx.innerHTML=b.join('');
+  const on=(id,fn)=>{ const el=$('#'+id); if(el) el.addEventListener('click',fn); };
+  on('btn-cl-screen', ()=>{ buildScreen(); show('#card-screen'); scrollTo_('#card-screen'); });
+  on('btn-cl-pre',    ()=>{ buildPrenotif(haePre.map(L=>L.model)); show('#card-prenotif'); scrollTo_('#card-prenotif'); });
+  on('btn-cl-exc',    ()=>{ buildException(); show('#card-exception'); scrollTo_('#card-exception'); });
+  on('btn-cl-summary',()=>{ buildSummary(); show('#card-summary'); scrollTo_('#card-summary'); });
 }
 
 /* =====================================================================
    STEP 4 : 위험 점검
    ===================================================================== */
 function buildScreen(){
-  state.sanctionsHits=[]; state.prenotifModels=[];
-  const items=controlItems();
-  const sb=$('#sanctions-body'); sb.innerHTML='';
-  items.forEach(it=>{
-    const sHit = DB.sanctions.find(r=>hsMatch(it.hs, F.hs(r)));
-    const pHit = DB.prenotif.find(r=>hsMatch(it.hs, F.hs(r)));
-    if(sHit) state.sanctionsHits.push({model:it.model, hs:it.hs, desc:F.desc(sHit)});
-    if(pHit) state.prenotifModels.push({model:it.model, hs:it.hs});
-    const lines=[];
-    if(it.source==='found') lines.push(note('warn','!','판정결과 <b>해당</b> 모델입니다. (유효 판정) 사전신고/제재 대상 여부를 점검합니다.'));
-    if(it.noHsMatch) lines.push(note('warn','!','추천 HS 매칭 결과가 없어 위험 점검이 필요합니다.'));
-    if(sHit) lines.push(note('danger','!',`<b>대러 제재대상 품목 가능성이 높습니다.</b> (HS ${esc(it.hs)} · ${esc(F.desc(sHit))}) 허가 필요 여부를 반드시 검토하세요.`));
-    if(pHit) lines.push(note('warn','i','사전신고 대상 HS에 해당합니다 — STEP 5에서 사전신고서를 작성하세요.'));
-    if(!sHit && !pHit && !it.noHsMatch) lines.push(note('ok','✓','대러 제재대상/사전신고 대상 HS에 매칭되지 않았습니다.'));
-    const c=document.createElement('div'); c.className='mcard';
-    c.innerHTML=`<div class="head"><span class="mname">${esc(it.model)}</span>${badge('neutral','HS '+esc(it.hs||'-'))}</div><div class="body">${lines.join('')}</div>`;
-    sb.appendChild(c);
-  });
+  state.sanctionsHits=[];
+  const items=controlItems();   // 유효 '비해당' 모델
+  const sb=$('#sanctions-body');
+  if(!items.length){
+    sb.innerHTML=note('info','i','위험 점검 대상(유효 · 비해당) 모델이 없습니다.');
+  } else {
+    sb.innerHTML='';
+    sb.insertAdjacentHTML('beforeend', note('info','i','<b>비해당</b> 모델은 상황허가(catch-all) 위험 점검 대상입니다. 대러 제재 해당 여부와 상황허가 의심징후를 점검하세요.'));
+    items.forEach(it=>{
+      const sHit = DB.sanctions.find(r=>hsMatch(it.hs, F.hs(r)));
+      if(sHit) state.sanctionsHits.push({model:it.model, hs:it.hs, desc:F.desc(sHit)});
+      const lines=[];
+      if(sHit) lines.push(note('danger','!',`<b>대러 제재대상 품목 가능성이 높습니다.</b> (HS ${esc(it.hs)} · ${esc(F.desc(sHit))}) 허가 필요 여부를 반드시 검토하세요.`));
+      else lines.push(note('ok','✓','대러 제재대상 HS에 매칭되지 않았습니다.'));
+      const c=document.createElement('div'); c.className='mcard';
+      c.innerHTML=`<div class="head"><span class="mname">${esc(it.model)}</span>${badge('neutral','HS '+esc(it.hs||'-'))}</div><div class="body">${lines.join('')}</div>`;
+      sb.appendChild(c);
+    });
+  }
 
   const eb=$('#enduser-body');
   eb.innerHTML=`
@@ -969,8 +997,27 @@ $('#btn-screen-next').addEventListener('click', ()=>{
   }
   state.indicators = INDICATORS.map((_,i)=>$('#ind-'+i).checked);
   state.screened = true;
-  buildPrenotif(); show('#card-prenotif'); scrollTo_('#card-prenotif');
+  saveDraft();
+  buildSummary(); show('#card-summary'); scrollTo_('#card-summary');
 });
+
+/* =====================================================================
+   허가예외 검토 (해당 · 사전신고 비대상)
+   ===================================================================== */
+function exceptionItems(){ return state.lookups.filter(L=>L.found && !L.expired && L.isHae && !hsIsPrenotif(L.hs)); }
+function buildException(){
+  const list=exceptionItems(); const host=$('#exception-body');
+  if(!list.length){ host.innerHTML=note('info','i','허가예외 검토 대상(해당 · 사전신고 비대상) 모델이 없습니다.'); return; }
+  host.innerHTML = note('danger','!','아래 품목은 <b>상황허가 대상(해당)</b>이나 <b>사전신고 대상 HS가 아닙니다</b>. <b>개별수출허가</b> 또는 <b>허가예외</b> 적용 가능 여부를 담당 부서와 검토하세요.')
+   + list.map(L=>`<div class="mcard"><div class="head"><span class="mname">${esc(L.model)}</span>${badge('danger','허가예외 검토')}</div>
+       <div class="body"><dl class="kv">
+         <dt>제품명</dt><dd>${esc(L.item||'-')}</dd>
+         <dt>HS코드</dt><dd class="mono">${esc(L.hs||'-')}</dd>
+         <dt>판정번호</dt><dd class="mono">${esc(L.number||'-')}</dd>
+         <dt>유효기한</dt><dd>${esc(L.expiry||'-')}</dd>
+       </dl></div></div>`).join('');
+}
+$('#btn-exc-summary').addEventListener('click',()=>{ buildSummary(); show('#card-summary'); scrollTo_('#card-summary'); });
 
 /* =====================================================================
    STEP 5 : 사전신고 (인보이스 기반)
@@ -990,11 +1037,12 @@ function modelCandidates(model){
   return out.filter(c=>c.number);
 }
 
-function buildPrenotif(){
-  $('#prenotif-intro').innerHTML = note('info','i','앞서 입력한 모델을 바탕으로 판정 DB를 참조해 사전신고 내용을 작성합니다. <b>1개 인보이스 = 1개 수출거래</b>이며, 한 인보이스에 여러 품목을 넣을 수 있습니다.');
+function buildPrenotif(seedModels){
+  $('#prenotif-intro').innerHTML = note('info','i','<b>해당 · 사전신고 대상</b> 모델의 판정 DB를 참조해 사전신고 내용을 작성합니다. <b>1개 인보이스 = 1개 수출거래</b>이며, 한 인보이스에 여러 품목을 넣을 수 있습니다.');
   if(!state.preInvoices.length){
+    const seed = (seedModels && seedModels.length)? seedModels : (state.models.length? state.models : ['']);
     const inv=emptyInvoice();
-    inv.items = (state.models.length? state.models : ['']).map(m=>emptyItem(m));
+    inv.items = seed.map(m=>emptyItem(m));
     state.preInvoices=[inv];
   }
   renderInvoices();
@@ -1168,7 +1216,8 @@ function reportHTML(){
   parts.push(`<h2>${sec++}. 모델별 판정정보 조회 결과</h2>`);
   state.lookups.forEach(L=>{
     if(!L.found){ parts.push(`<div class="box"><h3>${esc(L.model)} — 판정정보 없음 (판정 필요)</h3></div>`); return; }
-    parts.push(`<div class="box"><h3>${esc(L.model)} — ${L.expired?'만료됨 (재판정 필요)':(L.isHae?'유효 · 해당':'유효 · 비해당')}</h3>
+    const stat = L.expired?'만료됨 (재판정 필요)':(!L.isHae?'유효 · 비해당 (위험 점검 대상)':(hsIsPrenotif(L.hs)?'유효 · 해당 (사전신고 대상)':'유효 · 해당 (허가예외 검토)'));
+    parts.push(`<div class="box"><h3>${esc(L.model)} — ${stat}</h3>
       <table>
       <tr><th>제품명</th><td>${esc(L.item||'-')}</td><th>HS코드(HSKCD)</th><td>${esc(L.hs||'-')}</td></tr>
       <tr><th>규격</th><td>${esc(L.spec||'-')}</td><th>판정구분</th><td>${esc(L.type)}</td></tr>
@@ -1237,6 +1286,14 @@ function reportHTML(){
         </table>
         <p style="text-align:right;margin:6px 2px 0"><b>합계(USD): ${fmtUSD(sum)}</b></p></div>`);
     });
+  }
+
+  if(exceptionItems().length){
+    parts.push(`<h2>${sec++}. 허가예외 검토 (해당 · 사전신고 비대상)</h2>`);
+    parts.push(`<div class="box bad"><b>아래 품목은 상황허가 대상(해당)이나 사전신고 대상 HS가 아닙니다 — 개별수출허가/허가예외 적용 가능 여부 검토 필요</b>
+      <table class="cards"><tr><th>모델명</th><th>제품명</th><th>HS코드</th><th>판정번호</th><th>유효기한</th></tr>
+      ${exceptionItems().map(L=>`<tr><td data-label="모델명">${esc(L.model)}</td><td data-label="제품명">${esc(L.item||'-')}</td><td data-label="HS코드">${esc(L.hs||'-')}</td><td data-label="판정번호">${esc(L.number||'-')}</td><td data-label="유효기한">${esc(L.expiry||'-')}</td></tr>`).join('')}
+      </table></div>`);
   }
 
   const style=`<style>
