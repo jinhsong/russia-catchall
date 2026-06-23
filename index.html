@@ -120,7 +120,7 @@ input[type=file]{font-size:13px}
 .sus .n{font-weight:700;color:var(--copper);margin-right:4px}
 
 /* form output (document slip) */
-.formout{background:#fff;border:1px solid var(--line);border-left:3px solid var(--copper);border-radius:0 10px 10px 0;padding:15px 17px;font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-size:12.6px;white-space:pre-wrap;line-height:1.75;max-height:340px;overflow:auto;color:var(--ink)}
+.formout{background:#fff;border:1px solid var(--line);border-left:3px solid var(--copper);border-radius:0 10px 10px 0;padding:15px 17px;font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-size:12.6px;white-space:pre;tab-size:4;line-height:1.75;max-height:340px;overflow:auto;color:var(--ink)}
 .toolbar{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:10px}
 
 /* table */
@@ -503,6 +503,8 @@ $('#btn-lookup').addEventListener('click', ()=>{
   const raw = $('#models').value || '';
   const models = [...new Set(raw.split(/[\s,;\t\n]+/).map(s=>s.trim()).filter(Boolean))];
   if(!models.length){ alert('모델명을 1개 이상 입력하세요.'); return; }
+  const tooShort = models.filter(m=>m.length<3);
+  if(tooShort.length){ alert('모델명은 3글자 이상 입력하세요: '+tooShort.join(', ')); return; }
   state.models = models;
   state.lookups = models.map(lookupModel);
   // 이전 진행상태 초기화
@@ -621,15 +623,18 @@ function buildClassify(){
       <div class="head"><span class="mname">${idx+1}번 품목 · ${esc(L.model)}</span>${badge('info','신규 판정')}</div>
       <div class="body">
         <div><label class="fld req">물품명(제품명)</label>
-          <input type="text" id="cl-item-${id}" placeholder="예: 스마트폰, 태블릿 등">
+          <input type="text" id="cl-item-${id}" minlength="2" placeholder="예: 스마트폰, 태블릿 등 (2글자 이상)">
           <div class="hint">물품명을 입력하면 아래에 추천 HS코드가 표시됩니다.</div>
           <div class="chips" id="cl-recwrap-${id}"></div>
         </div>
-        <div style="margin-top:12px"><label class="fld req">HS코드 (한국 수출기준)</label>
-          <input type="text" id="cl-hs-${id}" placeholder="추천 HS 클릭 또는 직접 입력">
+        <div style="margin-top:12px"><label class="fld req">HS코드 (숫자만)</label>
+          <input type="text" id="cl-hs-${id}" inputmode="numeric" placeholder="예: 851713000 (점·하이픈 없이 숫자만)">
           <div id="cl-hsnote-${id}" style="margin-top:8px"></div>
         </div>
-        <div style="margin-top:12px"><label class="fld req">사양 및 규격</label><input type="text" id="cl-spec-${id}" placeholder="예: 256GB / 12GB, 약 2.5kg"></div>
+        <div class="row" style="margin-top:12px">
+          <div class="col"><label class="fld req">사양 및 규격</label><input type="text" id="cl-spec-${id}" placeholder="예: 256GB / 12GB"></div>
+          <div class="col" style="flex:0 0 200px"><label class="fld req">무게</label><input type="text" id="cl-weight-${id}" placeholder="예: 약 0.2kg"></div>
+        </div>
         <div style="margin-top:12px"><label class="fld req">용도</label><input type="text" id="cl-purpose-${id}"></div>
       </div>`;
     body.appendChild(c);
@@ -638,7 +643,9 @@ function buildClassify(){
     const id=inp.id.replace('cl-item-','');
     inp.addEventListener('input', ()=>{ recommendHS(id); markHsNote(id); });
   });
-  $$('input[id^="cl-hs-"]', body).forEach(inp=>inp.addEventListener('input', ()=>markHsNote(inp.id.replace('cl-hs-',''))));
+  $$('input[id^="cl-hs-"]', body).forEach(inp=>inp.addEventListener('input', ()=>{
+    inp.value=inp.value.replace(/[^0-9]/g,''); markHsNote(inp.id.replace('cl-hs-',''));
+  }));
 }
 // 거래자 정보(수입국/수입자) 입력 UI
 function buildTrader(){
@@ -692,7 +699,7 @@ function recommendHS(id){
     const hs=F.hs(r); if(seen.has(hs))return; seen.add(hs);
     const chip=document.createElement('span'); chip.className='chip';
     chip.innerHTML = `${esc(hs)}<span class="hsx">${esc(F.desc(r))}</span>`;
-    chip.addEventListener('click',()=>{ $('#cl-hs-'+id).value=hs; markHsNote(id); });
+    chip.addEventListener('click',()=>{ $('#cl-hs-'+id).value=normHS(hs); markHsNote(id); });
     wrap.appendChild(chip);
   });
 }
@@ -720,18 +727,30 @@ $('#btn-classify-gen').addEventListener('click', ()=>{
   for(const L of state.lookups.filter(x=>!x.found)){
     const id=cssId(L.model);
     const o={ model:L.model,
-      item: $('#cl-item-'+id).value.trim(), hs: $('#cl-hs-'+id).value.trim(),
-      spec: $('#cl-spec-'+id).value.trim(), purpose: $('#cl-purpose-'+id).value.trim(),
+      item: $('#cl-item-'+id).value.trim(),
+      hs: normHS($('#cl-hs-'+id).value),
+      spec: $('#cl-spec-'+id).value.trim(),
+      weight: $('#cl-weight-'+id).value.trim(),
+      purpose: $('#cl-purpose-'+id).value.trim(),
       recHs: recListFor(id) };
-    if(!o.item||!o.hs||!o.spec||!o.purpose){ alert(`[${L.model}] 물품명, HS코드, 사양 및 규격, 용도는 필수입니다.`); return; }
+    if(o.model.trim().length<3){ alert(`모델명은 3글자 이상이어야 합니다: ${o.model}`); return; }
+    if(o.item.length<2){ alert(`[${L.model}] 제품명(물품명)은 2글자 이상 입력하세요.`); return; }
+    if(!o.hs){ alert(`[${L.model}] HS코드를 숫자로 입력하세요.`); return; }
+    if(!o.spec){ alert(`[${L.model}] 사양 및 규격을 입력하세요.`); return; }
+    if(!o.weight){ alert(`[${L.model}] 무게를 입력하세요.`); return; }
+    if(!o.purpose){ alert(`[${L.model}] 용도를 입력하세요.`); return; }
     o.usedRec = o.recHs.length ? o.recHs.some(r=>hsMatch(r,o.hs)) : null;
     o.noHsMatch = (o.recHs.length===0);
+    o.specFull = `${o.spec} / 무게: ${o.weight}`;
     state.classify[L.model]=o; items.push(o);
   }
 
   const n=items.length;
   const title = `상황허가 대상품목 확인을 위한 판정 신청 (${items[0].model}${n>1?` 등 ${n}건`:''})`;
-  const itemLines = items.map((it,i)=>`${i+1}번 품목 ${it.hs} | ${it.item} | ${it.model} | ${it.spec} | ${it.purpose}`).join('\n');
+  // 품목 정보 표 (탭 구분 — Office/HWP 등에 붙여넣으면 표로 변환)
+  const tableHeader = `No.\tHS코드\t제품명\t모델명\t사양 및 규격\t용도`;
+  const tableRows = items.map((it,i)=>`${i+1}\t${it.hs}\t${it.item}\t${it.model}\t${it.specFull}\t${it.purpose}`);
+  const itemTable = [tableHeader, ...tableRows].join('\n');
   const attachLines = items.map((it,i)=>`첨부 ${i+1}. ${i+1}번 품목 ${it.model} 사양서 파일`).join('\n');
   const body =
 `상황허가 대상품목(제재품목) 확인을 위한 신청품의를 다음과 같이 상신합니다.
@@ -741,7 +760,7 @@ $('#btn-classify-gen').addEventListener('click', ()=>{
  - 수입자: ${importers.join(', ')}
 
 2. 품목 정보
-${itemLines}
+${itemTable}
 
 ${attachLines}`;
 
@@ -957,7 +976,12 @@ function reportHTML(){
       <tr><th>수입국</th><td>${esc(d.countries.join(', '))}</td></tr>
       <tr><th>수입자</th><td>${esc(d.importers.join(', '))}</td></tr></table>
       <h4>품의 제목</h4><pre>${esc(d.title)}</pre>
-      <h4>품의 본문</h4><pre>${esc(d.body)}</pre>
+      <h4>품목 정보</h4>
+      <table><tr><th>No.</th><th>HS코드</th><th>제품명</th><th>모델명</th><th>사양 및 규격</th><th>용도</th></tr>
+      ${d.items.map((it,i)=>`<tr><td>${i+1}</td><td>${esc(it.hs)}</td><td>${esc(it.item)}</td><td>${esc(it.model)}</td><td>${esc(it.specFull)}</td><td>${esc(it.purpose)}</td></tr>`).join('')}
+      </table>
+      <h4>첨부</h4><ul style="margin:4px 0 0">${d.items.map((it,i)=>`<li>첨부 ${i+1}. ${i+1}번 품목 ${esc(it.model)} 사양서 파일</li>`).join('')}</ul>
+      <h4>복사용 본문 (표 포함)</h4><pre>${esc(d.body)}</pre>
       <p class="meta">※ 품의에는 신청 품목별 사양서 첨부 필요 · 통상그룹(송진혁/강부현 프로) 합의 — 파트장 이상 결재</p>
       </div>`);
   }
