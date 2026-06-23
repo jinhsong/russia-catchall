@@ -8,6 +8,8 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Noto+Serif+KR:wght@500;600;700&display=swap" rel="stylesheet">
 <link rel="stylesheet" as="style" crossorigin href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard.min.css">
+<!-- 엑셀(xlsx) 파싱용. 사내망에서 차단되면 CSV로 대체됩니다. -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 <style>
 :root{
   --ink:#15243d;--ink-soft:#2d3e5c;--paper:#f4f1e9;--paper-2:#faf8f2;
@@ -184,8 +186,8 @@ details.paste[open]>summary::before{content:"▾ "}
       <summary>DB를 불러오지 못했나요? 파일 직접 선택</summary>
       <p class="hint" style="margin:8px 0">로컬에서 <code>file://</code>로 열면 보안정책상 자동 로드가 막힐 수 있습니다. 그럴 땐 아래에서 CSV 파일들을 직접 선택하세요.</p>
       <div class="row">
-        <div class="col"><label class="fld">자가판정결과</label><input type="file" accept=".csv" data-load="self"></div>
-        <div class="col"><label class="fld">전문판정결과</label><input type="file" accept=".csv" data-load="expert"></div>
+        <div class="col"><label class="fld">자가판정결과 (xlsx/csv)</label><input type="file" accept=".xlsx,.xls,.csv" data-load="self"></div>
+        <div class="col"><label class="fld">전문판정결과 (xlsx/csv)</label><input type="file" accept=".xlsx,.xls,.csv" data-load="expert"></div>
       </div>
       <div class="row" style="margin-top:8px">
         <div class="col"><label class="fld">키워드-HS 매칭</label><input type="file" accept=".csv" data-load="keywordHs"></div>
@@ -284,12 +286,15 @@ details.paste[open]>summary::before{content:"▾ "}
 /* =====================================================================
    설정: DB / 양식 파일 경로
    ===================================================================== */
+// 자가/전문 판정 DB는 "(상황)자가판정…", "(상황)전문판정…" xlsx 파일을 각각
+// data/self.xlsx, data/expert.xlsx 로 올려두면 자동으로 읽습니다(제목행=2행).
+// xlsx가 없으면 같은 위치의 CSV(데모/대체용)를 사용합니다.
 const DATA_FILES = {
-  self:      'data/self_classification.csv',
-  expert:    'data/expert_classification.csv',
-  keywordHs: 'data/keyword_hs.csv',
-  sanctions: 'data/russia_sanctions_hs.csv',
-  prenotif:  'data/prenotification_hs.csv',
+  self:      { xlsx:'data/self.xlsx',   csv:'data/self_classification.csv',   sheetHeaderRow:2 },
+  expert:    { xlsx:'data/expert.xlsx', csv:'data/expert_classification.csv', sheetHeaderRow:2 },
+  keywordHs: { csv:'data/keyword_hs.csv' },
+  sanctions: { csv:'data/russia_sanctions_hs.csv' },
+  prenotif:  { csv:'data/prenotification_hs.csv' },
 };
 const FORM_FILES = {
   reclassification: 'forms/reclassification.txt',
@@ -360,19 +365,39 @@ function parseCSV(text){
   return clean.slice(1).map(r=>{ const o={}; headers.forEach((h,i)=>o[h]=(r[i]||'').trim()); return o; });
 }
 function field(obj, aliases){ for(const a of aliases){ if(obj[a]!=null && obj[a]!=='') return obj[a]; } return ''; }
+
+/* 날짜 유틸 (판정일 → 유효기한 = 판정일 + 2년) */
+function fmtDate(d){ return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0'); }
+function parseDate(v){
+  if(v==null||v==='') return null;
+  if(v instanceof Date) return isNaN(v)?null:v;
+  if(typeof v==='number'){ const d=new Date(Math.round((v-25569)*86400*1000)); return isNaN(d)?null:d; } // 엑셀 시리얼
+  let s=String(v).trim().replace(/[.\/]/g,'-').replace(/\s+/g,'').replace(/-+$/,'');
+  let m=s.match(/^(\d{4})-(\d{1,2})-(\d{1,2})$/);
+  if(m){ const d=new Date(+m[1],+m[2]-1,+m[3]); return isNaN(d)?null:d; }
+  const d=new Date(s); return isNaN(d)?null:d;
+}
+function addYears(d,n){ const x=new Date(d.getTime()); x.setFullYear(x.getFullYear()+n); return x; }
+const VALID_YEARS = 2; // 판정일로부터 유효기간(년)
+
+/* 셀 값 → 문자열 (Date는 YYYY-MM-DD) */
+const S = v => v==null ? '' : (v instanceof Date ? fmtDate(v) : String(v)).trim();
 const F = {
-  model:r=>field(r,['모델명','model','Model']),
-  item: r=>field(r,['품목명','물품명','item']),
-  result:r=>field(r,['판정결과','result']),
-  number:r=>field(r,['판정번호','number']),
-  expiry:r=>field(r,['유효기한','유효기간','expiry']),
-  keyword:r=>field(r,['키워드','keyword']),
-  hs:r=>field(r,['HS코드','HS','hs','HSK']),
-  desc:r=>field(r,['품목설명','설명','desc']),
+  model:r=>S(field(r,['모델명(설명)','모델명','model','Model'])),
+  item: r=>S(field(r,['제품명','품목명','물품명','item'])),
+  result:r=>S(field(r,['결과','판정결과','result'])),
+  number:r=>S(field(r,['판정번호','number'])),
+  expiry:r=>S(field(r,['유효기한','유효기간','expiry'])),
+  detDate:r=>field(r,['판정일','detDate']),         // 원시값(Date/숫자/문자) → parseDate 처리
+  spec:r=>S(field(r,['규격','사양규격','사양 및 규격','spec'])),
+  keyword:r=>S(field(r,['키워드','keyword'])),
+  hs:r=>S(field(r,['HSKCD','HS코드','HS','hs','HSK'])),
+  desc:r=>S(field(r,['품목설명','설명','desc'])),
 };
 const normHS = s => String(s||'').replace(/[^0-9]/g,'');
 function hsMatch(a,b){ a=normHS(a); b=normHS(b);
   if(a.length<4||b.length<4) return false; return a.startsWith(b)||b.startsWith(a); }
+const isHaeResult = res => /해당/.test(res) && !/비해당/.test(res);
 
 /* markup helpers */
 function badge(type, text){ return `<span class="badge ${type}"><span class="pip"></span>${esc(text)}</span>`; }
@@ -381,10 +406,35 @@ function note(type, ic, html){ return `<div class="note ${type}"><span class="ic
 /* =====================================================================
    DB / 양식 로드
    ===================================================================== */
-function ingest(key, text){ DB[key]=parseCSV(text); dbLoaded[key]=true; renderDbStatus(); }
+function ingestRows(key, rows){ DB[key]=rows||[]; dbLoaded[key]=true; renderDbStatus(); }
+
+// xlsx → 객체 배열. headerRow는 제목행 위치(1-based; 상황판정 파일은 2).
+function parseXlsx(buf, headerRow){
+  if(typeof XLSX==='undefined') return [];
+  const wb=XLSX.read(buf,{type:'array',cellDates:true});
+  const ws=wb.Sheets[wb.SheetNames[0]];
+  const aoa=XLSX.utils.sheet_to_json(ws,{header:1,defval:'',raw:true,blankrows:false});
+  const hi=(headerRow||1)-1;
+  const headers=(aoa[hi]||[]).map(h=>String(h).trim());
+  const out=[];
+  for(let i=hi+1;i<aoa.length;i++){
+    const r=aoa[i]; if(!r || !r.some(c=>String(c==null?'':c).trim()!=='')) continue;
+    const o={}; headers.forEach((h,j)=>{ if(h) o[h]=(r[j]==null?'':r[j]); }); out.push(o);
+  }
+  return out;
+}
+
 async function loadAll(){
-  await Promise.all(Object.entries(DATA_FILES).map(async ([k,path])=>{
-    try{ const r=await fetch(path,{cache:'no-store'}); if(r.ok) ingest(k, await r.text()); }catch(e){}
+  await Promise.all(Object.entries(DATA_FILES).map(async ([k,cfg])=>{
+    // 1) xlsx 우선 (XLSX 로드 가능 + 파일 존재 시)
+    if(cfg.xlsx && typeof XLSX!=='undefined'){
+      try{ const r=await fetch(cfg.xlsx,{cache:'no-store'});
+        if(r.ok){ ingestRows(k, parseXlsx(await r.arrayBuffer(), cfg.sheetHeaderRow||1)); return; } }catch(e){}
+    }
+    // 2) CSV 대체
+    if(cfg.csv){
+      try{ const r=await fetch(cfg.csv,{cache:'no-store'}); if(r.ok) ingestRows(k, parseCSV(await r.text())); }catch(e){}
+    }
   }));
   await Promise.all(Object.entries(FORM_FILES).map(async ([k,path])=>{
     try{ const r=await fetch(path,{cache:'no-store'}); if(r.ok) FORMS[k]=await r.text(); }catch(e){}
@@ -401,7 +451,16 @@ function renderDbStatus(){
 $$('input[data-load]').forEach(inp=>{
   inp.addEventListener('change', e=>{
     const f=e.target.files[0]; if(!f) return;
-    const rd=new FileReader(); rd.onload=()=>{ ingest(inp.dataset.load, rd.result); }; rd.readAsText(f,'utf-8');
+    const key=inp.dataset.load;
+    const isX=/\.xlsx?$/i.test(f.name);
+    const rd=new FileReader();
+    rd.onload=()=>{
+      if(isX){
+        if(typeof XLSX==='undefined'){ alert('엑셀 파서를 불러오지 못했습니다(사내망 차단 가능). CSV로 올려주세요.'); return; }
+        ingestRows(key, parseXlsx(rd.result, (DATA_FILES[key]&&DATA_FILES[key].sheetHeaderRow)||1));
+      } else { ingestRows(key, parseCSV(rd.result)); }
+    };
+    if(isX) rd.readAsArrayBuffer(f); else rd.readAsText(f,'utf-8');
   });
 });
 
@@ -423,16 +482,35 @@ $('#btn-lookup').addEventListener('click', ()=>{
   show('#card-results'); scrollTo_('#card-results');
 });
 
+function normModel(s){ return String(s||'').trim().toLowerCase().replace(/\s+/g,''); }
+function modelMatch(cell, query){
+  const c=normModel(cell), q=normModel(query);
+  if(!c||!q) return false;
+  return c===q || (q.length>=3 && c.includes(q)); // 모델명(설명) 안에 모델명이 포함된 경우도 매칭
+}
+function rankType(c){ return c.type==='전문판정'?0:1; } // 전문판정 우선
+
 function lookupModel(model){
-  const m = model.toLowerCase();
-  const find = arr => arr.find(r=>F.model(r).toLowerCase()===m);
-  let hit = find(DB.expert), type='전문판정';
-  if(!hit){ hit = find(DB.self); type='자가판정'; }
-  if(!hit) return { model, found:false };
-  const expiry = F.expiry(hit);
-  const expired = expiry && expiry < today();
-  return { model, found:true, type, result:F.result(hit), number:F.number(hit),
-           expiry, item:F.item(hit), hs:F.hs(hit), expired:!!expired };
+  const cands=[];
+  const scan=(arr,type)=>(arr||[]).forEach(r=>{
+    if(!modelMatch(F.model(r), model)) return;
+    const dDate=parseDate(F.detDate(r));
+    let expiry='', detStr='', expired=false;
+    if(dDate){ const e=addYears(dDate,VALID_YEARS); expiry=fmtDate(e); detStr=fmtDate(dDate);
+      const t=new Date(); t.setHours(0,0,0,0); expired = t>e; }
+    else { expiry=F.expiry(r); expired = !!(expiry && expiry<today()); } // 판정일 없을 때 유효기한 직접 사용
+    const res=F.result(r);
+    cands.push({ type, result:res||'-', number:F.number(r), hs:F.hs(r), item:F.item(r),
+      spec:F.spec(r), detDate:detStr, expiry, expired, isHae:isHaeResult(res),
+      _d:dDate?dDate.getTime():0 });
+  });
+  scan(DB.expert,'전문판정'); scan(DB.self,'자가판정');
+  if(!cands.length) return { model, found:false };
+  const sortFn=(a,b)=> rankType(a)-rankType(b) || b._d-a._d; // 전문판정 → 최근 판정일 순
+  const valid=cands.filter(c=>!c.expired).sort(sortFn);
+  const pick = valid.length ? valid[0] : cands.filter(c=>c.expired).sort(sortFn)[0];
+  const expiredNums=[...new Set(cands.filter(c=>c.expired).map(c=>c.number).filter(Boolean))];
+  return { model, found:true, multi:cands.length>1, allExpiredNums:expiredNums, ...pick };
 }
 
 function renderResults(){
@@ -443,39 +521,62 @@ function renderResults(){
       c.innerHTML = `<div class="head"><span class="mname">${esc(L.model)}</span>${badge('info','판정정보 없음')}</div>
         <div class="body">${note('warn','!','이 모델은 판정 이력이 없습니다. <b>판정이 필요</b>합니다. (아래 STEP 3에서 신청 정보를 입력하세요.)')}</div>`;
     } else if(L.expired){
+      const expNums = (L.allExpiredNums&&L.allExpiredNums.length)? L.allExpiredNums.join(', ') : L.number;
       c.innerHTML = `<div class="head"><span class="mname">${esc(L.model)}</span>${badge('danger','만료 · 재판정 필요')}</div>
         <div class="body">${kvBlock(L)}
-        ${note('danger','!',`유효기한(${esc(L.expiry)})이 지났습니다. 아래 <b>재판정 요청서</b>로 재판정을 요청하세요. (만료된 판정번호 포함)`)}
+        ${note('danger','!',`유효기한(${esc(L.expiry)})이 지났습니다. 아래 <b>재판정 요청서</b>로 재판정을 요청하세요. (만료 판정번호: ${esc(expNums||'-')})`)}
         ${formBlock(fillForm(FORMS.reclassification || defaultReclassForm(), {
-            '판정번호':L.number,'모델명':L.model,'품목명':L.item,'판정종류':L.type,
+            '판정번호':expNums,'모델명':L.model,'품목명':L.item,'판정종류':L.type,
             '판정결과':L.result,'유효기한':L.expiry,'오늘':today()
         }), 're-'+cssId(L.model))}</div>`;
+    } else if(L.isHae){
+      c.innerHTML = `<div class="head"><span class="mname">${esc(L.model)}</span>${badge('warn','유효 · 해당')}</div>
+        <div class="body">${kvBlock(L)}${note('warn','!',`판정결과가 <b>해당</b>입니다. 유효기한: <b>${esc(L.expiry||'-')}</b> · 대러 제재대상/사전신고 대상 여부를 아래 단계에서 점검하세요.`)}</div>`;
     } else {
-      c.innerHTML = `<div class="head"><span class="mname">${esc(L.model)}</span>${badge('ok','유효')}</div>
-        <div class="body">${kvBlock(L)}${note('ok','✓',`유효한 판정입니다. 유효기한: <b>${esc(L.expiry||'-')}</b>`)}</div>`;
+      c.innerHTML = `<div class="head"><span class="mname">${esc(L.model)}</span>${badge('ok','유효 · 비해당')}</div>
+        <div class="body">${kvBlock(L)}${note('ok','✓',`유효한 판정(비해당)입니다. 유효기한: <b>${esc(L.expiry||'-')}</b> · 추가 조치가 필요하지 않습니다.`)}</div>`;
     }
     body.appendChild(c);
   });
   const needClassify = state.lookups.filter(L=>!L.found);
+  const foundHae = state.lookups.filter(L=>L.found && !L.expired && L.isHae);
   const nx = $('#results-next'); nx.innerHTML='';
   if(needClassify.length){
     nx.innerHTML = `<button class="btn primary" id="btn-to-classify">판정 신청 진행 (${needClassify.length}개 모델)</button>`;
     $('#btn-to-classify').addEventListener('click', ()=>{ buildClassify(); show('#card-classify'); scrollTo_('#card-classify'); });
+  } else if(foundHae.length){
+    nx.innerHTML = `<button class="btn primary" id="btn-to-screen">위험 점검 진행 (해당 ${foundHae.length}개 모델)</button>`;
+    $('#btn-to-screen').addEventListener('click', ()=>{ buildScreen(); show('#card-screen'); scrollTo_('#card-screen'); });
   } else {
     nx.innerHTML = `<button class="btn primary" id="btn-to-summary">결과 보고서로 이동</button>`;
     $('#btn-to-summary').addEventListener('click', ()=>{ buildSummary(); show('#card-summary'); scrollTo_('#card-summary'); });
   }
   bindCopy(body);
 }
+// 상황허가/사전신고 점검 대상: 판정신청(미판정) 모델 + 유효한 '해당' 모델
+function controlItems(){
+  const out=[];
+  state.lookups.forEach(L=>{
+    if(L.found){
+      if(!L.expired && L.isHae) out.push({model:L.model, hs:L.hs, number:L.number, item:L.item, source:'found', noHsMatch:false});
+    } else {
+      const o=state.classify[L.model];
+      if(o) out.push({model:L.model, hs:o.hs, number:'', item:o.item, source:'need', noHsMatch:o.noHsMatch});
+    }
+  });
+  return out;
+}
 function kvBlock(L){
   return `<dl class="kv" style="margin-bottom:12px">
     <dt>모델명</dt><dd>${esc(L.model)}</dd>
     <dt>제품명</dt><dd>${esc(L.item||'-')}</dd>
-    <dt>HS코드</dt><dd class="mono">${esc(L.hs||'-')}</dd>
-    <dt>판정구분</dt><dd>${esc(L.type)}</dd>
+    <dt>HS코드(HSKCD)</dt><dd class="mono">${esc(L.hs||'-')}</dd>
+    <dt>규격</dt><dd>${esc(L.spec||'-')}</dd>
+    <dt>판정구분</dt><dd>${esc(L.type)}${L.multi?' <span class="badge neutral">복수 판정</span>':''}</dd>
     <dt>판정결과</dt><dd>${esc(L.result)}</dd>
     <dt>판정번호</dt><dd class="mono">${esc(L.number||'-')}</dd>
-    <dt>유효기한</dt><dd>${esc(L.expiry||'-')}</dd></dl>`;
+    <dt>판정일</dt><dd>${esc(L.detDate||'-')}</dd>
+    <dt>유효기한<br><span class="small muted">(판정일+2년)</span></dt><dd>${esc(L.expiry||'-')}</dd></dl>`;
 }
 
 /* =====================================================================
@@ -575,20 +676,21 @@ $('#btn-classify-next').addEventListener('click', ()=>{
    ===================================================================== */
 function buildScreen(){
   state.sanctionsHits=[]; state.prenotifModels=[];
+  const items=controlItems();
   const sb=$('#sanctions-body'); sb.innerHTML='';
-  state.lookups.filter(L=>!L.found).forEach(L=>{
-    const o=state.classify[L.model]; if(!o) return;
-    const sHit = DB.sanctions.find(r=>hsMatch(o.hs, F.hs(r)));
-    const pHit = DB.prenotif.find(r=>hsMatch(o.hs, F.hs(r)));
-    if(sHit) state.sanctionsHits.push({model:L.model, hs:o.hs, desc:F.desc(sHit)});
-    if(pHit) state.prenotifModels.push({model:L.model, hs:o.hs});
+  items.forEach(it=>{
+    const sHit = DB.sanctions.find(r=>hsMatch(it.hs, F.hs(r)));
+    const pHit = DB.prenotif.find(r=>hsMatch(it.hs, F.hs(r)));
+    if(sHit) state.sanctionsHits.push({model:it.model, hs:it.hs, desc:F.desc(sHit)});
+    if(pHit) state.prenotifModels.push({model:it.model, hs:it.hs});
     const lines=[];
-    if(o.noHsMatch) lines.push(note('warn','!','추천 HS 매칭 결과가 없어 위험 점검이 필요합니다.'));
-    if(sHit) lines.push(note('danger','!',`<b>대러 제재대상 품목 가능성이 높습니다.</b> (HS ${esc(o.hs)} · ${esc(F.desc(sHit))}) 허가 필요 여부를 반드시 검토하세요.`));
+    if(it.source==='found') lines.push(note('warn','!','판정결과 <b>해당</b> 모델입니다. (유효 판정) 사전신고/제재 대상 여부를 점검합니다.'));
+    if(it.noHsMatch) lines.push(note('warn','!','추천 HS 매칭 결과가 없어 위험 점검이 필요합니다.'));
+    if(sHit) lines.push(note('danger','!',`<b>대러 제재대상 품목 가능성이 높습니다.</b> (HS ${esc(it.hs)} · ${esc(F.desc(sHit))}) 허가 필요 여부를 반드시 검토하세요.`));
     if(pHit) lines.push(note('warn','i','사전신고 대상 HS에 해당합니다 — STEP 5에서 사전신고서를 작성하세요.'));
-    if(!sHit && !pHit && !o.noHsMatch) lines.push(note('ok','✓','대러 제재대상/사전신고 대상 HS에 매칭되지 않았습니다.'));
+    if(!sHit && !pHit && !it.noHsMatch) lines.push(note('ok','✓','대러 제재대상/사전신고 대상 HS에 매칭되지 않았습니다.'));
     const c=document.createElement('div'); c.className='mcard';
-    c.innerHTML=`<div class="head"><span class="mname">${esc(L.model)}</span>${badge('neutral','HS '+esc(o.hs))}</div><div class="body">${lines.join('')}</div>`;
+    c.innerHTML=`<div class="head"><span class="mname">${esc(it.model)}</span>${badge('neutral','HS '+esc(it.hs||'-'))}</div><div class="body">${lines.join('')}</div>`;
     sb.appendChild(c);
   });
 
@@ -602,9 +704,9 @@ function buildScreen(){
     <div style="margin-top:12px"><label class="fld">사업 분야 / 활용 분야</label><input type="text" id="eu-business"></div>
     <div id="eu-per" class="hide" style="margin-top:12px"></div>`;
   const per=$('#eu-per');
-  per.innerHTML = state.lookups.filter(L=>!L.found).map(L=>{
-    const id=cssId(L.model);
-    return `<div class="mcard"><div class="head"><span class="mname">${esc(L.model)} 의 최종사용자</span></div>
+  per.innerHTML = items.map(it=>{
+    const id=cssId(it.model);
+    return `<div class="mcard"><div class="head"><span class="mname">${esc(it.model)} 의 최종사용자</span></div>
       <div class="body"><input type="text" id="eu-name-${id}" placeholder="최종사용자(상호)"></div></div>`;
   }).join('');
   $('#eu-same').addEventListener('change',e=>{ per.classList.toggle('hide', e.target.checked); });
@@ -624,8 +726,9 @@ $('#btn-screen-next').addEventListener('click', ()=>{
     business:$('#eu-business').value.trim(), perModel:{} };
   if(!state.enduser.name && same){ alert('최종사용자(상호)를 입력하세요.'); return; }
   if(!same){
-    state.lookups.filter(L=>!L.found).forEach(L=>{
-      const id=cssId(L.model); state.enduser.perModel[L.model]=$('#eu-name-'+id).value.trim();
+    controlItems().forEach(it=>{
+      const id=cssId(it.model); const el=$('#eu-name-'+id);
+      state.enduser.perModel[it.model]= el? el.value.trim() : '';
     });
   }
   state.indicators = INDICATORS.map((_,i)=>$('#ind-'+i).checked);
@@ -736,11 +839,12 @@ function reportHTML(){
   parts.push(`<h2>1. 모델별 판정정보 조회 결과</h2>`);
   state.lookups.forEach(L=>{
     if(!L.found){ parts.push(`<div class="box"><h3>${esc(L.model)} — 판정정보 없음 (판정 필요)</h3></div>`); return; }
-    parts.push(`<div class="box"><h3>${esc(L.model)} — ${L.expired?'만료됨 (재판정 필요)':'유효'}</h3>
+    parts.push(`<div class="box"><h3>${esc(L.model)} — ${L.expired?'만료됨 (재판정 필요)':(L.isHae?'유효 · 해당':'유효 · 비해당')}</h3>
       <table>
-      <tr><th>제품명</th><td>${esc(L.item||'-')}</td><th>HS코드</th><td>${esc(L.hs||'-')}</td></tr>
-      <tr><th>판정구분</th><td>${esc(L.type)}</td><th>판정결과</th><td>${esc(L.result)}</td></tr>
-      <tr><th>판정번호</th><td>${esc(L.number||'-')}</td><th>유효기한</th><td>${esc(L.expiry||'-')}</td></tr>
+      <tr><th>제품명</th><td>${esc(L.item||'-')}</td><th>HS코드(HSKCD)</th><td>${esc(L.hs||'-')}</td></tr>
+      <tr><th>규격</th><td>${esc(L.spec||'-')}</td><th>판정구분</th><td>${esc(L.type)}</td></tr>
+      <tr><th>판정결과</th><td>${esc(L.result)}</td><th>판정번호</th><td>${esc(L.number||'-')}</td></tr>
+      <tr><th>판정일</th><td>${esc(L.detDate||'-')}</td><th>유효기한(판정일+2년)</th><td>${esc(L.expiry||'-')}</td></tr>
       </table>
       ${L.expired?`<h4>재판정 요청서</h4><pre>${esc(fillForm(FORMS.reclassification||defaultReclassForm(),{
         '판정번호':L.number,'모델명':L.model,'품목명':L.item,'판정종류':L.type,
