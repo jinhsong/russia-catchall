@@ -249,20 +249,10 @@ details.paste[open]>summary::before{content:"▾ "}
   <div class="card hide" id="card-prenotif">
     <h2><span class="num">5</span>사전신고</h2>
     <div id="prenotif-intro" style="margin-top:14px"></div>
-    <div id="prenotif-body" class="hide">
-      <div class="row">
-        <div class="col"><label class="fld req">구매자</label><input type="text" id="pn-buyer"></div>
-        <div class="col"><label class="fld req">최종수하인</label><input type="text" id="pn-consignee"></div>
-        <div class="col"><label class="fld req">최종사용자</label><input type="text" id="pn-enduser"></div>
-      </div>
-      <div class="divider"></div>
-      <h3 class="serif" style="font-size:15px;margin-bottom:6px">모델별 수출 내역</h3>
-      <p class="hint" style="margin-bottom:10px">판정번호는 DB에서 자동 매칭됩니다(없으면 비어 있음). 수량·단가(USD)·용도를 입력하세요.</p>
-      <div id="pn-models"></div>
-      <div class="toolbar" style="margin-top:14px"><button class="btn primary" id="btn-prenotif-gen">사전신고서 생성</button></div>
-      <div id="pn-form-out"></div>
-    </div>
-    <div class="toolbar" style="margin-top:14px;margin-bottom:0"><button class="btn ghost" id="btn-prenotif-skip">다음 (결과 보고서) →</button></div>
+    <div id="pn-invoices" style="margin-top:14px"></div>
+    <div class="toolbar"><button class="btn" id="btn-add-invoice">+ 인보이스 추가</button></div>
+    <div class="divider"></div>
+    <div class="toolbar" style="margin-bottom:0"><button class="btn primary" id="btn-prenotif-save">사전신고 내용 저장 · 결과 보고서로 이동</button></div>
   </div>
 
   <!-- ================= STEP 6 ================= -->
@@ -354,7 +344,7 @@ const state = {
   models:[], lookups:[], classify:{}, classifyDoc:null, screened:false,
   enduser:{ name:'', country:'', business:'', sameForAll:true, perModel:{} },
   indicators:[], sanctionsHits:[], prenotifModels:[],
-  prenotif:{ buyer:'',consignee:'',enduser:'', rows:[] },
+  preInvoices:[], preDone:false,
 };
 
 /* =====================================================================
@@ -517,7 +507,7 @@ $('#btn-lookup').addEventListener('click', ()=>{
   state.classify={}; state.classifyDoc=null; state.screened=false;
   state.sanctionsHits=[]; state.prenotifModels=[];
   state.enduser={ name:'', country:'', business:'', sameForAll:true, perModel:{} };
-  state.prenotif={ buyer:'',consignee:'',enduser:'', rows:[] };
+  state.preInvoices=[]; state.preDone=false;
   ['#card-classify','#card-screen','#card-prenotif','#card-summary'].forEach(s=>$(s).classList.add('hide'));
   const doc=$('#classify-doc-out'); if(doc) doc.innerHTML='';
   const cn=$('#classify-next'); if(cn) cn.innerHTML='';
@@ -583,17 +573,19 @@ function renderResults(){
   });
   const needClassify = state.lookups.filter(L=>!L.found);
   const foundHae = state.lookups.filter(L=>L.found && !L.expired && L.isHae);
-  const nx = $('#results-next'); nx.innerHTML='';
-  if(needClassify.length){
-    nx.innerHTML = `<button class="btn primary" id="btn-to-classify">판정 신청 진행 (${needClassify.length}개 모델)</button>`;
-    $('#btn-to-classify').addEventListener('click', ()=>{ buildClassify(); show('#card-classify'); scrollTo_('#card-classify'); });
-  } else if(foundHae.length){
-    nx.innerHTML = `<button class="btn primary" id="btn-to-screen">위험 점검 진행 (해당 ${foundHae.length}개 모델)</button>`;
-    $('#btn-to-screen').addEventListener('click', ()=>{ buildScreen(); show('#card-screen'); scrollTo_('#card-screen'); });
-  } else {
-    nx.innerHTML = `<button class="btn primary" id="btn-to-summary">결과 보고서로 이동</button>`;
-    $('#btn-to-summary').addEventListener('click', ()=>{ buildSummary(); show('#card-summary'); scrollTo_('#card-summary'); });
-  }
+  const nx = $('#results-next');
+  const btns=[];
+  if(needClassify.length) btns.push(`<button class="btn primary" id="btn-to-classify">판정 신청 작성 (${needClassify.length}개 모델)</button>`);
+  if(foundHae.length) btns.push(`<button class="btn" id="btn-to-screen">위험 점검 (해당 ${foundHae.length}개)</button>`);
+  btns.push(`<button class="btn${needClassify.length?'':' primary'}" id="btn-to-prenotif">사전신고 진행하기</button>`);
+  btns.push(`<button class="btn ghost" id="btn-to-summary">결과 보고서</button>`);
+  if(needClassify.length) btns.push(`<div class="hint" style="flex-basis:100%;margin-top:4px">※ 판정 DB는 실시간이 아닙니다. 이미 판정된 품목이라면 <b>‘사전신고 진행하기’</b>로 진행하세요.</div>`);
+  nx.innerHTML = btns.join('');
+  const on=(id,fn)=>{ const b=$('#'+id); if(b) b.addEventListener('click',fn); };
+  on('btn-to-classify', ()=>{ buildClassify(); show('#card-classify'); scrollTo_('#card-classify'); });
+  on('btn-to-screen',   ()=>{ buildScreen();   show('#card-screen');   scrollTo_('#card-screen'); });
+  on('btn-to-prenotif', ()=>{ buildPrenotif(); show('#card-prenotif'); scrollTo_('#card-prenotif'); });
+  on('btn-to-summary',  ()=>{ buildSummary();  show('#card-summary');  scrollTo_('#card-summary'); });
   bindCopy(body);
 }
 // 위험 점검/사전신고 대상: 유효한 '해당' 모델만. (신규 판정건은 STEP 3 품의로 별도 처리)
@@ -633,8 +625,8 @@ function buildClassify(){
           <div class="hint">물품명을 입력하면 아래에 추천 HS코드가 표시됩니다.</div>
           <div class="chips" id="cl-recwrap-${id}"></div>
         </div>
-        <div style="margin-top:12px"><label class="fld req">HS코드 (숫자만)</label>
-          <input type="text" id="cl-hs-${id}" inputmode="numeric" placeholder="예: 851713000 (점·하이픈 없이 숫자만)">
+        <div style="margin-top:12px"><label class="fld req">HS코드 (숫자 10자리)</label>
+          <input type="text" id="cl-hs-${id}" inputmode="numeric" maxlength="10" placeholder="예: 8517130000 (점·하이픈 자동 제거)">
           <div id="cl-hsnote-${id}" style="margin-top:8px"></div>
         </div>
         <div class="row" style="margin-top:12px">
@@ -650,7 +642,8 @@ function buildClassify(){
     inp.addEventListener('input', ()=>{ recommendHS(id); markHsNote(id); });
   });
   $$('input[id^="cl-hs-"]', body).forEach(inp=>inp.addEventListener('input', ()=>{
-    inp.value=inp.value.replace(/[^0-9]/g,''); markHsNote(inp.id.replace('cl-hs-',''));
+    inp.value=inp.value.replace(/[^0-9]/g,'').slice(0,10); inp.dataset.src='직접입력';
+    markHsNote(inp.id.replace('cl-hs-',''));
   }));
 }
 // 거래자 정보(수입국/수입자) 입력 UI
@@ -704,7 +697,7 @@ function recommendHS(id){
     const hs=F.hs(r); if(seen.has(hs))return; seen.add(hs);
     const chip=document.createElement('span'); chip.className='chip';
     chip.innerHTML = `${esc(hs)}<span class="hsx">${esc(F.desc(r))}</span>`;
-    chip.addEventListener('click',()=>{ $('#cl-hs-'+id).value=normHS(hs); markHsNote(id); });
+    chip.addEventListener('click',()=>{ const el=$('#cl-hs-'+id); el.value=normHS(hs).slice(0,10); el.dataset.src='추천선택'; markHsNote(id); });
     wrap.appendChild(chip);
   });
 }
@@ -731,21 +724,21 @@ $('#btn-classify-gen').addEventListener('click', ()=>{
   const items=[];
   for(const L of state.lookups.filter(x=>!x.found)){
     const id=cssId(L.model);
+    const hsEl=$('#cl-hs-'+id);
     const o={ model:L.model,
       item: $('#cl-item-'+id).value.trim(),
-      hs: normHS($('#cl-hs-'+id).value),
+      hs: normHS(hsEl.value).slice(0,10),
+      hsSource: hsEl.dataset.src || '직접입력',
       spec: $('#cl-spec-'+id).value.trim(),
       weight: $('#cl-weight-'+id).value.trim(),
       purpose: $('#cl-purpose-'+id).value.trim(),
       recHs: recListFor(id) };
     if(o.model.trim().length<3){ alert(`모델명은 3글자 이상이어야 합니다: ${o.model}`); return; }
     if(o.item.length<2){ alert(`[${L.model}] 제품명(물품명)은 2글자 이상 입력하세요.`); return; }
-    if(!o.hs){ alert(`[${L.model}] HS코드를 숫자로 입력하세요.`); return; }
+    if(o.hs.length!==10){ alert(`[${L.model}] HS코드는 숫자 10자리로 입력하세요. (현재 ${o.hs.length}자리)`); return; }
     if(!o.spec){ alert(`[${L.model}] 사양 및 규격을 입력하세요.`); return; }
     if(!o.weight){ alert(`[${L.model}] 무게를 입력하세요.`); return; }
     if(!o.purpose){ alert(`[${L.model}] 용도를 입력하세요.`); return; }
-    o.usedRec = o.recHs.length ? o.recHs.some(r=>hsMatch(r,o.hs)) : null;
-    o.noHsMatch = (o.recHs.length===0);
     o.specFull = `${o.spec} / 무게: ${o.weight}`;
     state.classify[L.model]=o; items.push(o);
   }
@@ -753,8 +746,8 @@ $('#btn-classify-gen').addEventListener('click', ()=>{
   const n=items.length;
   const title = `상황허가 대상품목 확인을 위한 판정 신청 (${items[0].model}${n>1?` 등 ${n}건`:''})`;
   // 품목 정보 표 (탭 구분 — Office/HWP 등에 붙여넣으면 표로 변환)
-  const tableHeader = `No.\tHS코드\t제품명\t모델명\t사양 및 규격\t용도`;
-  const tableRows = items.map((it,i)=>`${i+1}\t${it.hs}\t${it.item}\t${it.model}\t${it.specFull}\t${it.purpose}`);
+  const tableHeader = `No.\tHS코드\tHS구분\t제품명\t모델명\t사양 및 규격\t용도`;
+  const tableRows = items.map((it,i)=>`${i+1}\t${it.hs}\t${it.hsSource}\t${it.item}\t${it.model}\t${it.specFull}\t${it.purpose}`);
   const itemTable = [tableHeader, ...tableRows].join('\n');
   const attachLines = items.map((it,i)=>`첨부 ${i+1}. ${i+1}번 품목 ${it.model} 사양서 파일`).join('\n');
   const body =
@@ -864,62 +857,144 @@ $('#btn-screen-next').addEventListener('click', ()=>{
 });
 
 /* =====================================================================
-   STEP 5 : 사전신고
+   STEP 5 : 사전신고 (인보이스 기반)
    ===================================================================== */
+function emptyInvoice(){ return { no:'', endUser:'', endUse:'', items:[] }; }
+function emptyItem(model){ return { model:model||'', candIdx:0, item:'', number:'', qty:'', price:'', paid:'유상' }; }
+
+// 모델명으로 판정 DB 후보(판정번호 있는 행) 조회
+function modelCandidates(model){
+  const out=[];
+  const scan=(arr,type)=>(arr||[]).forEach(r=>{
+    if(!modelMatch(F.model(r), model)) return;
+    const d=parseDate(F.detDate(r));
+    out.push({ type, item:F.item(r), number:F.number(r), hs:F.hs(r), detDate:d?fmtDate(d):F.expiry(r), result:F.result(r) });
+  });
+  scan(DB.expert,'전문판정'); scan(DB.self,'자가판정');
+  return out.filter(c=>c.number);
+}
+
 function buildPrenotif(){
-  const intro=$('#prenotif-intro'); const body=$('#prenotif-body');
-  if(!state.prenotifModels.length){
-    intro.innerHTML=note('ok','✓','사전신고 대상 HS에 해당하는 모델이 없어 사전신고가 필요하지 않습니다.');
-    body.classList.add('hide'); return;
+  $('#prenotif-intro').innerHTML = note('info','i','앞서 입력한 모델을 바탕으로 판정 DB를 참조해 사전신고 내용을 작성합니다. <b>1개 인보이스 = 1개 수출거래</b>이며, 한 인보이스에 여러 품목을 넣을 수 있습니다.');
+  if(!state.preInvoices.length){
+    const inv=emptyInvoice();
+    inv.items = (state.models.length? state.models : ['']).map(m=>emptyItem(m));
+    state.preInvoices=[inv];
   }
-  intro.innerHTML=note('danger','!',`다음 모델이 <b>사전신고 대상 HS</b>에 해당합니다: ${
-    state.prenotifModels.map(p=>`${esc(p.model)}(${esc(p.hs)})`).join(', ')}`);
-  body.classList.remove('hide');
-  $('#pn-enduser').value = state.enduser.name || '';
-  $('#pn-models').innerHTML = `<div class="scrollx"><table class="grid"><thead><tr>
-      <th>모델명</th><th>판정번호(자동)</th><th>수량</th><th>단가(USD)</th><th>용도</th></tr></thead>
-      <tbody>${state.prenotifModels.map(p=>{
-        const id=cssId(p.model); const num = matchedNumber(p.model);
-        return `<tr>
-          <td><b>${esc(p.model)}</b></td>
-          <td class="mono">${esc(num||'-')}<input type="hidden" id="pn-num-${id}" value="${esc(num||'')}"></td>
-          <td><input type="number" id="pn-qty-${id}" min="0" style="width:90px"></td>
-          <td><input type="number" id="pn-price-${id}" min="0" step="0.01" style="width:110px"></td>
-          <td><input type="text" id="pn-use-${id}"></td></tr>`;
-      }).join('')}</tbody></table></div>`;
+  renderInvoices();
 }
-function matchedNumber(model){
-  const L=state.lookups.find(x=>x.model===model);
-  if(L && L.found) return L.number;
-  const m=model.toLowerCase();
-  const hit = DB.expert.find(r=>F.model(r).toLowerCase()===m) || DB.self.find(r=>F.model(r).toLowerCase()===m);
-  return hit?F.number(hit):'';
+function renderInvoices(){
+  const host=$('#pn-invoices');
+  host.innerHTML = state.preInvoices.map((inv,iv)=>invoiceCardHtml(inv,iv)).join('');
+  bindInvoiceEvents(host);
 }
-
-$('#btn-prenotif-gen').addEventListener('click', ()=>{
-  state.prenotif.buyer=$('#pn-buyer').value.trim();
-  state.prenotif.consignee=$('#pn-consignee').value.trim();
-  state.prenotif.enduser=$('#pn-enduser').value.trim();
-  if(!state.prenotif.buyer||!state.prenotif.consignee||!state.prenotif.enduser){
-    alert('구매자, 최종수하인, 최종사용자는 필수입니다.'); return;
-  }
-  state.prenotif.rows = state.prenotifModels.map(p=>{
-    const id=cssId(p.model);
-    return { model:p.model, number:$('#pn-num-'+id).value,
-      qty:$('#pn-qty-'+id).value, price:$('#pn-price-'+id).value, use:$('#pn-use-'+id).value.trim() };
+function invoiceCardHtml(inv,iv){
+  return `<div class="mcard" style="margin-bottom:16px">
+    <div class="head"><span class="mname">인보이스 #${iv+1}</span>
+      ${state.preInvoices.length>1?`<button class="btn sm" data-delinv="${iv}">인보이스 삭제</button>`:''}</div>
+    <div class="body">
+      <div class="row">
+        <div class="col"><label class="fld req">인보이스 번호</label><input id="pn-${iv}-no" value="${esc(inv.no)}"></div>
+        <div class="col"><label class="fld req">최종사용자</label><input id="pn-${iv}-eu" value="${esc(inv.endUser)}"></div>
+        <div class="col"><label class="fld">최종사용용도</label><input id="pn-${iv}-use" value="${esc(inv.endUse)}"></div>
+      </div>
+      <h4 class="serif" style="font-size:14px;margin:14px 0 6px">품목 (${inv.items.length})</h4>
+      ${inv.items.map((it,k)=>itemRowHtml(iv,k,it)).join('') || '<p class="hint">품목이 없습니다. 아래 버튼으로 추가하세요.</p>'}
+      <div class="toolbar" style="margin-top:8px"><button class="btn sm" data-additem="${iv}">+ 품목 추가</button></div>
+    </div></div>`;
+}
+function itemRowHtml(iv,k,it){
+  const cands=modelCandidates(it.model);
+  const cand=cands[it.candIdx]||cands[0]||null;
+  const item=cand?cand.item:(it.item||'');
+  const number=cand?cand.number:(it.number||'');
+  const total=(parseFloat(it.qty)||0)*(parseFloat(it.price)||0);
+  return `<div class="mcard" style="margin:10px 0;background:var(--paper-2)">
+    <div class="head" style="background:#fff"><span class="mname">품목 ${k+1}</span>
+      <button class="btn sm" data-delitem="${iv}.${k}">품목 삭제</button></div>
+    <div class="body">
+      <div class="row">
+        <div class="col"><label class="fld">모델명</label>
+          <select id="pn-${iv}-${k}-model" data-model="${iv}.${k}">
+            ${(state.models.length?state.models:[it.model]).map(m=>`<option ${m===it.model?'selected':''}>${esc(m)}</option>`).join('')}
+          </select></div>
+        ${cands.length>1?`<div class="col"><label class="fld">제품명(판정) 선택</label>
+          <select id="pn-${iv}-${k}-cand" data-cand="${iv}.${k}">
+            ${cands.map((c,ci)=>`<option value="${ci}" ${ci===it.candIdx?'selected':''}>${esc(c.item||'(제품명 없음)')} · ${esc(c.number)}</option>`).join('')}
+          </select></div>`:''}
+      </div>
+      <div class="row" style="margin-top:10px">
+        <div class="col"><label class="fld">제품명</label><input id="pn-${iv}-${k}-item" value="${esc(item)}" ${cand?'readonly':''} placeholder="제품명"></div>
+        <div class="col"><label class="fld">판정발급번호</label><input id="pn-${iv}-${k}-number" value="${esc(number)}" ${cand?'readonly':''} placeholder="${cand?'':'판정 DB 없음 — 직접 입력'}"></div>
+      </div>
+      <div class="row" style="margin-top:10px">
+        <div class="col" style="flex:0 0 110px"><label class="fld req">수량(EA)</label><input type="number" min="0" id="pn-${iv}-${k}-qty" value="${esc(it.qty)}" data-calc="${iv}.${k}"></div>
+        <div class="col" style="flex:0 0 130px"><label class="fld req">단가(USD)</label><input type="number" min="0" step="0.01" id="pn-${iv}-${k}-price" value="${esc(it.price)}" data-calc="${iv}.${k}"></div>
+        <div class="col" style="flex:0 0 140px"><label class="fld">총액(USD)</label><input id="pn-${iv}-${k}-total" value="${total}" readonly></div>
+        <div class="col" style="flex:0 0 120px"><label class="fld">유무상</label>
+          <select id="pn-${iv}-${k}-paid"><option ${it.paid==='유상'?'selected':''}>유상</option><option ${it.paid==='무상'?'selected':''}>무상</option></select></div>
+      </div>
+      ${cands.length>1?`<div class="hint" style="margin-top:6px">이 모델은 판정이 여러 건입니다 — '제품명(판정) 선택'에서 올바른 판정을 고르세요.</div>`:''}
+      ${!cand?note('warn','!','판정 DB에서 이 모델의 판정번호를 찾지 못했습니다(DB 미반영 가능). 제품명·판정발급번호를 직접 입력하세요.'):''}
+    </div></div>`;
+}
+function bindInvoiceEvents(host){
+  $$('input[data-calc]',host).forEach(inp=>inp.addEventListener('input',()=>{
+    const [iv,k]=inp.dataset.calc.split('.').map(Number);
+    const q=parseFloat($(`#pn-${iv}-${k}-qty`).value)||0, p=parseFloat($(`#pn-${iv}-${k}-price`).value)||0;
+    $(`#pn-${iv}-${k}-total`).value = +(q*p).toFixed(2);
+  }));
+  $$('select[data-model]',host).forEach(sel=>sel.addEventListener('change',()=>{
+    const [iv,k]=sel.dataset.model.split('.').map(Number);
+    syncInvoices(); const it=state.preInvoices[iv].items[k]; it.model=sel.value; it.candIdx=0; it.item=''; it.number=''; renderInvoices();
+  }));
+  $$('select[data-cand]',host).forEach(sel=>sel.addEventListener('change',()=>{
+    const [iv,k]=sel.dataset.cand.split('.').map(Number);
+    syncInvoices(); state.preInvoices[iv].items[k].candIdx=+sel.value||0; renderInvoices();
+  }));
+  $$('button[data-delitem]',host).forEach(b=>b.addEventListener('click',()=>{
+    const [iv,k]=b.dataset.delitem.split('.').map(Number);
+    syncInvoices(); state.preInvoices[iv].items.splice(k,1); renderInvoices();
+  }));
+  $$('button[data-additem]',host).forEach(b=>b.addEventListener('click',()=>{
+    const iv=+b.dataset.additem; syncInvoices(); state.preInvoices[iv].items.push(emptyItem(state.models[0]||'')); renderInvoices();
+  }));
+  $$('button[data-delinv]',host).forEach(b=>b.addEventListener('click',()=>{
+    const iv=+b.dataset.delinv; syncInvoices(); state.preInvoices.splice(iv,1); renderInvoices();
+  }));
+}
+function syncInvoices(){
+  state.preInvoices.forEach((inv,iv)=>{
+    const g=id=>$('#'+id);
+    if(g(`pn-${iv}-no`)) inv.no=g(`pn-${iv}-no`).value.trim();
+    if(g(`pn-${iv}-eu`)) inv.endUser=g(`pn-${iv}-eu`).value.trim();
+    if(g(`pn-${iv}-use`)) inv.endUse=g(`pn-${iv}-use`).value.trim();
+    inv.items.forEach((it,k)=>{
+      const ms=g(`pn-${iv}-${k}-model`); if(ms) it.model=ms.value;
+      const cs=g(`pn-${iv}-${k}-cand`); if(cs) it.candIdx=+cs.value||0;
+      const im=g(`pn-${iv}-${k}-item`); if(im) it.item=im.value.trim();
+      const nm=g(`pn-${iv}-${k}-number`); if(nm) it.number=nm.value.trim();
+      const q=g(`pn-${iv}-${k}-qty`); if(q) it.qty=q.value;
+      const p=g(`pn-${iv}-${k}-price`); if(p) it.price=p.value;
+      const pd=g(`pn-${iv}-${k}-paid`); if(pd) it.paid=pd.value;
+    });
   });
-  const modelTable = state.prenotif.rows.map(r=>
-    ` - ${r.model} | 판정번호:${r.number||'-'} | 수량:${r.qty||'-'} | 단가(USD):${r.price||'-'} | 용도:${r.use||'-'}`).join('\n');
-  const indText = INDICATORS.map((t,i)=>`#${i+1} [${state.indicators[i]?'해당':'비해당'}] ${t}`).join('\n');
-  const filled = fillForm(FORMS.prenotification || defaultPrenotifForm(), {
-    '구매자':state.prenotif.buyer,'최종수하인':state.prenotif.consignee,'최종사용자':state.prenotif.enduser,
-    '모델목록':modelTable,'의심징후체크결과':indText,'오늘':today()
-  });
-  $('#pn-form-out').innerHTML = formBlock(filled,'pn-form');
-  bindCopy($('#pn-form-out'));
+}
+$('#btn-add-invoice').addEventListener('click',()=>{
+  syncInvoices(); const inv=emptyInvoice(); inv.items=[emptyItem(state.models[0]||'')];
+  state.preInvoices.push(inv); renderInvoices();
 });
-
-$('#btn-prenotif-skip').addEventListener('click', ()=>{ buildSummary(); show('#card-summary'); scrollTo_('#card-summary'); });
+$('#btn-prenotif-save').addEventListener('click',()=>{
+  syncInvoices();
+  // 최소 검증
+  for(const inv of state.preInvoices){
+    if(!inv.no){ alert('인보이스 번호를 입력하세요.'); return; }
+    if(!inv.endUser){ alert(`[인보이스 ${inv.no}] 최종사용자를 입력하세요.`); return; }
+    for(const it of inv.items){ if(!it.qty||!it.price){ alert(`[인보이스 ${inv.no}] 각 품목의 수량·단가를 입력하세요.`); return; } }
+  }
+  state.preDone=true;
+  buildSummary(); show('#card-summary'); scrollTo_('#card-summary');
+});
 
 /* =====================================================================
    양식 치환 / 복사 / 표시
@@ -990,8 +1065,8 @@ function reportHTML(){
       <tr><th>수입자</th><td>${esc(d.importers.join(', '))}</td></tr></table>
       <h4>품의 제목</h4><pre>${esc(d.title)}</pre>
       <h4>품목 정보</h4>
-      <table><tr><th>No.</th><th>HS코드</th><th>제품명</th><th>모델명</th><th>사양 및 규격</th><th>용도</th></tr>
-      ${d.items.map((it,i)=>`<tr><td>${i+1}</td><td>${esc(it.hs)}</td><td>${esc(it.item)}</td><td>${esc(it.model)}</td><td>${esc(it.specFull)}</td><td>${esc(it.purpose)}</td></tr>`).join('')}
+      <table><tr><th>No.</th><th>HS코드</th><th>HS구분</th><th>제품명</th><th>모델명</th><th>사양 및 규격</th><th>용도</th></tr>
+      ${d.items.map((it,i)=>`<tr><td>${i+1}</td><td>${esc(it.hs)}</td><td>${esc(it.hsSource||'')}</td><td>${esc(it.item)}</td><td>${esc(it.model)}</td><td>${esc(it.specFull)}</td><td>${esc(it.purpose)}</td></tr>`).join('')}
       </table>
       <h4>첨부</h4><ul style="margin:4px 0 0">${d.items.map((it,i)=>`<li>첨부 ${i+1}. ${i+1}번 품목 ${esc(it.model)} 사양서 파일</li>`).join('')}</ul>
       <h4>복사용 본문 (표 포함)</h4><pre>${esc(d.body)}</pre>
@@ -1017,23 +1092,26 @@ function reportHTML(){
       </table></div>`);
   }
 
-  if(state.prenotifModels.length && state.prenotif.rows.length){
-    parts.push(`<h2>${sec++}. 사전신고</h2>
-      <div class="box"><table>
-      <tr><th>구매자</th><td>${esc(state.prenotif.buyer)}</td></tr>
-      <tr><th>최종수하인</th><td>${esc(state.prenotif.consignee)}</td></tr>
-      <tr><th>최종사용자</th><td>${esc(state.prenotif.enduser)}</td></tr></table>
-      <h4>모델별 수출 내역</h4>
-      <table><tr><th>모델명</th><th>판정번호</th><th>수량</th><th>단가(USD)</th><th>용도</th></tr>
-      ${state.prenotif.rows.map(r=>`<tr><td>${esc(r.model)}</td><td>${esc(r.number||'-')}</td><td>${esc(r.qty||'-')}</td><td>${esc(r.price||'-')}</td><td>${esc(r.use||'-')}</td></tr>`).join('')}
-      </table>
-      <h4>사전신고서</h4><pre>${esc(fillForm(FORMS.prenotification||defaultPrenotifForm(),{
-        '구매자':state.prenotif.buyer,'최종수하인':state.prenotif.consignee,'최종사용자':state.prenotif.enduser,
-        '모델목록':state.prenotif.rows.map(r=>` - ${r.model} | 판정번호:${r.number||'-'} | 수량:${r.qty||'-'} | 단가(USD):${r.price||'-'} | 용도:${r.use||'-'}`).join('\n'),
-        '의심징후체크결과':INDICATORS.map((t,i)=>`#${i+1} [${state.indicators[i]?'해당':'비해당'}] ${t}`).join('\n'),
-        '오늘':today()}))}</pre></div>`);
-  } else if(state.prenotifModels.length){
-    parts.push(`<h2>${sec++}. 사전신고</h2><div class="box">사전신고 대상이나 신고서가 작성되지 않았습니다.</div>`);
+  if(state.preDone && state.preInvoices.length){
+    parts.push(`<h2>${sec++}. 사전신고</h2>`);
+    state.preInvoices.forEach((inv,iv)=>{
+      let sum=0;
+      const rows=inv.items.map(it=>{
+        const cand=modelCandidates(it.model)[it.candIdx];
+        const item=cand?cand.item:it.item; const number=cand?cand.number:it.number;
+        const total=(parseFloat(it.qty)||0)*(parseFloat(it.price)||0); sum+=total;
+        return `<tr><td>${esc(item||'-')}</td><td>${esc(it.model)}</td><td>${esc(number||'-')}</td><td>${esc(it.qty||'-')}</td><td>${esc(it.price||'-')}</td><td>${(+total.toFixed(2))}</td><td>${esc(it.paid||'-')}</td></tr>`;
+      }).join('');
+      parts.push(`<div class="box">
+        <table>
+        <tr><th>인보이스 번호</th><td>${esc(inv.no)}</td><th>최종사용자</th><td>${esc(inv.endUser)}</td></tr>
+        <tr><th>최종사용용도</th><td colspan="3">${esc(inv.endUse||'-')}</td></tr></table>
+        <h4>품목 (${inv.items.length})</h4>
+        <table><tr><th>제품명</th><th>모델명</th><th>판정발급번호</th><th>수량(EA)</th><th>단가(USD)</th><th>총액(USD)</th><th>유무상</th></tr>
+        ${rows}
+        <tr><th colspan="5" style="text-align:right">합계(USD)</th><td colspan="2"><b>${(+sum.toFixed(2))}</b></td></tr>
+        </table></div>`);
+    });
   }
 
   const style=`<style>
