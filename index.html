@@ -122,6 +122,8 @@ input[type=file]{font-size:13px}
 /* form output (document slip) */
 .formout{background:#fff;border:1px solid var(--line);border-left:3px solid var(--copper);border-radius:0 10px 10px 0;padding:15px 17px;font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-size:12.6px;white-space:pre;tab-size:4;line-height:1.75;max-height:340px;overflow:auto;color:var(--ink)}
 .toolbar{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:10px}
+.docedit{width:100%;font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-size:12.6px;line-height:1.7;border:1px solid var(--line-strong);border-radius:10px;padding:12px 14px;background:#fff;color:var(--ink);white-space:pre;overflow:auto}
+textarea.docedit{resize:vertical;min-height:90px}
 
 /* table */
 table.grid{width:100%;border-collapse:collapse;font-size:13.5px}
@@ -139,6 +141,20 @@ table.grid tr:last-child td{border-bottom:none}
 .chk:hover{border-color:var(--copper)}
 .chk input{width:17px;height:17px;accent-color:var(--ink)}
 .chk.on{border-color:var(--ink);background:var(--ink);color:#fff}
+/* 인라인 검증 */
+.input-err{border-color:var(--red)!important;box-shadow:0 0 0 3px rgba(156,43,37,.14)!important}
+.err-msg{color:var(--red);font-size:12px;font-weight:700;margin-top:4px}
+.err-summary{border-left-color:var(--red)}
+/* 진행 스테퍼 */
+.stepper{display:flex;gap:6px;max-width:980px;margin:0 auto;padding:0 22px 11px;overflow-x:auto;-webkit-overflow-scrolling:touch}
+.stepper button{flex:0 0 auto;border:1px solid var(--line-strong);background:#fff;color:var(--muted);border-radius:999px;padding:5px 13px;font-size:12px;font-weight:700;white-space:nowrap;transition:.15s}
+.stepper button:disabled{opacity:.45;cursor:not-allowed}
+.stepper button.active{background:var(--ink);color:#fff;border-color:var(--ink)}
+.stepper button.done{color:var(--ink);border-color:var(--copper)}
+/* 임시저장 복원 바 */
+.restorebar{max-width:980px;margin:10px auto 0;padding:0 22px}
+.restorebar .inner{background:var(--amber-bg);border:1px solid #e6d4a8;border-radius:10px;padding:10px 14px;display:flex;gap:10px;align-items:center;flex-wrap:wrap;font-size:13px}
+.chip.click{cursor:pointer}
 details.paste>summary{font-size:12.5px;color:var(--copper);cursor:pointer;font-weight:700;list-style:none}
 details.paste>summary::-webkit-details-marker{display:none}
 details.paste>summary::before{content:"▸ ";color:var(--copper)}
@@ -177,7 +193,18 @@ details.paste[open]>summary::before{content:"▾ "}
       <div class="sub">CATCH-ALL CONTROL · SELF-CHECK</div>
     </div>
   </div>
+  <nav class="stepper" id="stepper">
+    <button data-card="#card-input">1 조회</button>
+    <button data-card="#card-results">2 결과</button>
+    <button data-card="#card-classify">3 판정신청</button>
+    <button data-card="#card-screen">4 위험점검</button>
+    <button data-card="#card-prenotif">5 사전신고</button>
+    <button data-card="#card-summary">6 보고서</button>
+  </nav>
 </header>
+
+<div class="restorebar hide" id="restorebar"></div>
+<div class="banner" id="db-banner" style="margin-top:10px"></div>
 
 <div class="wrap">
 
@@ -252,6 +279,7 @@ details.paste[open]>summary::before{content:"▾ "}
     <div id="pn-invoices" style="margin-top:14px"></div>
     <div class="toolbar"><button class="btn" id="btn-add-invoice">+ 인보이스 추가</button></div>
     <div class="divider"></div>
+    <div id="pn-err"></div>
     <div class="toolbar" style="margin-bottom:0"><button class="btn primary" id="btn-prenotif-save">사전신고 내용 저장 · 결과 보고서로 이동</button></div>
   </div>
 
@@ -414,6 +442,49 @@ const isHaeResult = res => /해당/.test(res) && !/비해당/.test(res);
 /* markup helpers */
 function badge(type, text){ return `<span class="badge ${type}"><span class="pip"></span>${esc(text)}</span>`; }
 function note(type, ic, html){ return `<div class="note ${type}"><span class="ic">${ic}</span><span>${html}</span></div>`; }
+const fmtUSD = n => (Number(n)||0).toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2});
+
+/* 진행 스테퍼 */
+function setStep(sel){
+  $$('#stepper button').forEach(b=>{
+    const c=b.dataset.card; const vis = $(c) && !$(c).classList.contains('hide');
+    b.classList.toggle('active', c===sel);
+    b.classList.toggle('done', vis && c!==sel);
+    b.disabled = !vis && c!==sel;
+  });
+}
+$$('#stepper button').forEach(b=>b.addEventListener('click',()=>{
+  const c=b.dataset.card; if($(c) && !$(c).classList.contains('hide')){ setStep(c); scrollTo_(c); }
+}));
+
+/* DB 미탑재 경고 배너 */
+function renderDbBanner(){
+  const el=$('#db-banner'); if(!el) return;
+  const ok=(DB.self&&DB.self.length)||(DB.expert&&DB.expert.length);
+  el.innerHTML = ok ? '' : note('danger','!','<b>판정 DB가 로드되지 않았습니다.</b> 조회 결과가 정확하지 않을 수 있습니다. 페이지 하단 <b>‘판정 데이터 탑재 상태’</b>에서 파일을 직접 불러오거나 관리자에게 문의하세요.');
+}
+
+/* 인라인 검증 */
+function clearFieldErrs(scopeEl){
+  if(!scopeEl) return;
+  scopeEl.querySelectorAll('.input-err').forEach(e=>e.classList.remove('input-err'));
+  scopeEl.querySelectorAll('.err-msg').forEach(e=>e.remove());
+}
+function fieldErr(el, msg){
+  if(!el) return; el.classList.add('input-err');
+  const m=document.createElement('div'); m.className='err-msg'; m.textContent=msg;
+  el.insertAdjacentElement('afterend', m);
+}
+function errSummary(list){
+  return note('danger','!','<b>입력을 확인하세요</b><ul style="margin:6px 0 0;padding-left:18px;font-weight:600">'+list.map(e=>`<li>${esc(e)}</li>`).join('')+'</ul>');
+}
+
+/* 텍스트(편집 가능 양식) 복사 */
+function bindCopyText(root){
+  $$('[data-copytext]', root).forEach(b=>b.addEventListener('click',()=>{
+    const el=$('#form-'+b.dataset.copytext); if(el) copyText(el.value!==undefined?el.value:el.textContent, b);
+  }));
+}
 
 /* =====================================================================
    DB / 양식 로드
@@ -459,6 +530,7 @@ function renderDbStatus(){
     const mark = ok ? badge('ok','로드됨 ('+DB[k].length+'건)') : '<span class="badge neutral">미로드</span>';
     return `<div class="dbrow"><span>${DB_LABELS[k]}</span>${mark}</div>`;
   }).join('');
+  renderDbBanner();
 }
 $$('input[data-load]').forEach(inp=>{
   inp.addEventListener('change', e=>{
@@ -496,11 +568,11 @@ $('#btn-reset').addEventListener('click', ()=>{
   ['#card-results','#card-classify','#card-screen','#card-prenotif','#card-summary'].forEach(s=>$(s).classList.add('hide'));
   $('#card-input').scrollIntoView({behavior:'smooth',block:'start'});
 });
-$('#btn-lookup').addEventListener('click', ()=>{
+function doLookup(){
   const models = parseModelInput($('#models').value);
-  if(!models.length){ alert('모델명을 1개 이상 입력하세요.'); return; }
+  if(!models.length){ alert('모델명을 1개 이상 입력하세요.'); return false; }
   const tooShort = models.filter(m=>m.length<3);
-  if(tooShort.length){ alert('모델명은 3글자 이상 입력하세요: '+tooShort.join(', ')); return; }
+  if(tooShort.length){ alert('모델명은 3글자 이상 입력하세요: '+tooShort.join(', ')); return false; }
   state.models = models;
   state.lookups = models.map(lookupModel);
   // 이전 진행상태 초기화
@@ -512,7 +584,10 @@ $('#btn-lookup').addEventListener('click', ()=>{
   const doc=$('#classify-doc-out'); if(doc) doc.innerHTML='';
   const cn=$('#classify-next'); if(cn) cn.innerHTML='';
   renderResults();
-  show('#card-results'); scrollTo_('#card-results');
+  return true;
+}
+$('#btn-lookup').addEventListener('click', ()=>{
+  if(doLookup()){ show('#card-results'); scrollTo_('#card-results'); }
 });
 
 function normModel(s){ return String(s||'').trim().toLowerCase().replace(/\s+/g,''); }
@@ -695,7 +770,7 @@ function recommendHS(id){
   const seen=new Set();
   matches.forEach(r=>{
     const hs=F.hs(r); if(seen.has(hs))return; seen.add(hs);
-    const chip=document.createElement('span'); chip.className='chip';
+    const chip=document.createElement('button'); chip.type='button'; chip.className='chip click';
     chip.innerHTML = `${esc(hs)}<span class="hsx">${esc(F.desc(r))}</span>`;
     chip.addEventListener('click',()=>{ const el=$('#cl-hs-'+id); el.value=normHS(hs).slice(0,10); el.dataset.src='추천선택'; markHsNote(id); });
     wrap.appendChild(chip);
@@ -716,10 +791,12 @@ function markHsNote(id){
 }
 
 $('#btn-classify-gen').addEventListener('click', ()=>{
+  const card=$('#card-classify'); clearFieldErrs(card);
+  const errs=[];
   const countries = selectedCountries();
   const importers = selectedImporters();
-  if(!countries.length){ alert('수입국을 1개 이상 선택하세요.'); return; }
-  if(!importers.length){ alert('수입자를 1개 이상 선택하거나 입력하세요.'); return; }
+  if(!countries.length) errs.push('수입국을 1개 이상 선택하세요.');
+  if(!importers.length) errs.push('수입자를 1개 이상 선택하거나 입력하세요.');
 
   const items=[];
   for(const L of state.lookups.filter(x=>!x.found)){
@@ -733,15 +810,20 @@ $('#btn-classify-gen').addEventListener('click', ()=>{
       weight: $('#cl-weight-'+id).value.trim(),
       purpose: $('#cl-purpose-'+id).value.trim(),
       recHs: recListFor(id) };
-    if(o.model.trim().length<3){ alert(`모델명은 3글자 이상이어야 합니다: ${o.model}`); return; }
-    if(o.item.length<2){ alert(`[${L.model}] 제품명(물품명)은 2글자 이상 입력하세요.`); return; }
-    if(o.hs.length!==10){ alert(`[${L.model}] HS코드는 숫자 10자리로 입력하세요. (현재 ${o.hs.length}자리)`); return; }
-    if(!o.spec){ alert(`[${L.model}] 사양 및 규격을 입력하세요.`); return; }
-    if(!o.weight){ alert(`[${L.model}] 무게를 입력하세요.`); return; }
-    if(!o.purpose){ alert(`[${L.model}] 용도를 입력하세요.`); return; }
+    if(o.item.length<2){ fieldErr($('#cl-item-'+id),'제품명은 2글자 이상'); errs.push(`[${L.model}] 제품명은 2글자 이상`); }
+    if(o.hs.length!==10){ fieldErr(hsEl,`HS코드는 숫자 10자리 (현재 ${o.hs.length}자리)`); errs.push(`[${L.model}] HS코드 숫자 10자리`); }
+    if(!o.spec){ fieldErr($('#cl-spec-'+id),'사양 및 규격 입력'); errs.push(`[${L.model}] 사양 및 규격`); }
+    if(!o.weight){ fieldErr($('#cl-weight-'+id),'무게 입력'); errs.push(`[${L.model}] 무게`); }
+    if(!o.purpose){ fieldErr($('#cl-purpose-'+id),'용도 입력'); errs.push(`[${L.model}] 용도`); }
     o.specFull = `${o.spec} / 무게: ${o.weight}`;
-    state.classify[L.model]=o; items.push(o);
+    items.push(o);
   }
+  if(errs.length){
+    $('#classify-doc-out').innerHTML = `<div class="divider"></div>${errSummary(errs)}`;
+    const f=card.querySelector('.input-err'); if(f){ f.focus(); }
+    return;
+  }
+  items.forEach(o=>{ state.classify[o.model]=o; });
 
   const n=items.length;
   const title = `상황허가 대상품목 확인을 위한 판정 신청 (${items[0].model}${n>1?` 등 ${n}건`:''})`;
@@ -763,22 +845,36 @@ ${itemTable}
 ${attachLines}`;
 
   state.classifyDoc = { countries, importers, items, title, body };
+  renderClassifyDoc();
+  saveDraft();
+});
 
+// 품의 제목·본문 출력 (편집 가능 + 복사). state.classifyDoc 기반 — 복원 시에도 재사용.
+function renderClassifyDoc(){
+  const d=state.classifyDoc; if(!d) return;
   const guide =
     `<div class="note danger" style="border-left-width:5px;background:var(--red-bg)"><span class="ic">!</span><span>
        <b style="font-size:14px">📌 상신 전 반드시 확인하세요</b>
        <ul style="margin:8px 0 0;padding-left:18px;font-weight:600">
-         <li>신청 품의 상신 시 아래 <b>제목과 본문을 복사</b>하여 사용하시기 바랍니다.</li>
+         <li>신청 품의 상신 시 아래 <b>제목과 본문을 복사</b>하여 사용하시기 바랍니다. (필요 시 직접 수정 가능)</li>
          <li>품의에는 <b>신청 품목별 사양서 첨부</b>가 필요합니다.</li>
          <li><b>통상그룹(송진혁/강부현 프로) 합의</b> 후 <b>파트장 이상 결재</b>로 진행해 주시기 바랍니다.</li>
        </ul></span></div>`;
   $('#classify-doc-out').innerHTML =
     `<div class="divider"></div>${guide}
-     <label class="fld">제목</label>${formBlock(title,'cl-title')}
-     <label class="fld" style="margin-top:6px">본문</label>${formBlock(body,'cl-body')}`;
-  bindCopy($('#classify-doc-out'));
+     <div class="toolbar"><button class="btn primary sm" id="btn-copy-all">제목+본문 전체 복사</button>
+       <span class="hint" style="align-self:center">아래에서 직접 수정 후 복사할 수 있습니다.</span></div>
+     <label class="fld">제목</label>
+     <input class="docedit" id="form-cl-title" value="${esc(d.title)}">
+     <div class="toolbar" style="margin-top:6px"><button class="btn sm" data-copytext="cl-title">제목 복사</button></div>
+     <label class="fld" style="margin-top:8px">본문</label>
+     <textarea class="docedit" id="form-cl-body" rows="14">${esc(d.body)}</textarea>
+     <div class="toolbar" style="margin-top:6px"><button class="btn sm" data-copytext="cl-body">본문 복사</button></div>`;
+  bindCopyText($('#classify-doc-out'));
+  $('#form-cl-title').addEventListener('input', e=>{ state.classifyDoc.title=e.target.value; });
+  $('#form-cl-body').addEventListener('input', e=>{ state.classifyDoc.body=e.target.value; });
+  $('#btn-copy-all').addEventListener('click', e=>copyText($('#form-cl-title').value+'\n\n'+$('#form-cl-body').value, e.currentTarget));
 
-  // 다음 단계: 신규 판정건은 여기서 마무리(위험점검 자동 이동 없음). 유효 '해당' 모델이 있으면 별도 점검 버튼 제공.
   const foundHae = state.lookups.filter(L=>L.found && !L.expired && L.isHae);
   const nx=$('#classify-next'); nx.innerHTML='';
   if(foundHae.length){
@@ -789,7 +885,7 @@ ${attachLines}`;
     nx.innerHTML = `<button class="btn primary" id="btn-cl-summary">결과 보고서로 이동</button>`;
   }
   $('#btn-cl-summary').addEventListener('click', ()=>{ buildSummary(); show('#card-summary'); scrollTo_('#card-summary'); });
-});
+}
 
 /* =====================================================================
    STEP 4 : 위험 점검
@@ -930,7 +1026,7 @@ function itemRowHtml(iv,k,it){
       <div class="row" style="margin-top:10px">
         <div class="col" style="flex:0 0 110px"><label class="fld req">수량(EA)</label><input type="number" min="0" id="pn-${iv}-${k}-qty" value="${esc(it.qty)}" data-calc="${iv}.${k}"></div>
         <div class="col" style="flex:0 0 130px"><label class="fld req">단가(USD)</label><input type="number" min="0" step="0.01" id="pn-${iv}-${k}-price" value="${esc(it.price)}" data-calc="${iv}.${k}"></div>
-        <div class="col" style="flex:0 0 140px"><label class="fld">총액(USD)</label><input id="pn-${iv}-${k}-total" value="${total}" readonly></div>
+        <div class="col" style="flex:0 0 140px"><label class="fld">총액(USD)</label><input id="pn-${iv}-${k}-total" value="${fmtUSD(total)}" readonly></div>
         <div class="col" style="flex:0 0 120px"><label class="fld">유무상</label>
           <select id="pn-${iv}-${k}-paid"><option ${it.paid==='유상'?'selected':''}>유상</option><option ${it.paid==='무상'?'selected':''}>무상</option></select></div>
       </div>
@@ -942,7 +1038,7 @@ function bindInvoiceEvents(host){
   $$('input[data-calc]',host).forEach(inp=>inp.addEventListener('input',()=>{
     const [iv,k]=inp.dataset.calc.split('.').map(Number);
     const q=parseFloat($(`#pn-${iv}-${k}-qty`).value)||0, p=parseFloat($(`#pn-${iv}-${k}-price`).value)||0;
-    $(`#pn-${iv}-${k}-total`).value = +(q*p).toFixed(2);
+    $(`#pn-${iv}-${k}-total`).value = fmtUSD(q*p);
   }));
   $$('select[data-model]',host).forEach(sel=>sel.addEventListener('change',()=>{
     const [iv,k]=sel.dataset.model.split('.').map(Number);
@@ -986,13 +1082,19 @@ $('#btn-add-invoice').addEventListener('click',()=>{
 });
 $('#btn-prenotif-save').addEventListener('click',()=>{
   syncInvoices();
-  // 최소 검증
-  for(const inv of state.preInvoices){
-    if(!inv.no){ alert('인보이스 번호를 입력하세요.'); return; }
-    if(!inv.endUser){ alert(`[인보이스 ${inv.no}] 최종사용자를 입력하세요.`); return; }
-    for(const it of inv.items){ if(!it.qty||!it.price){ alert(`[인보이스 ${inv.no}] 각 품목의 수량·단가를 입력하세요.`); return; } }
-  }
-  state.preDone=true;
+  const card=$('#card-prenotif'); clearFieldErrs(card); $('#pn-err').innerHTML='';
+  const errs=[];
+  state.preInvoices.forEach((inv,iv)=>{
+    if(!inv.no){ fieldErr($(`#pn-${iv}-no`),'인보이스 번호 입력'); errs.push(`인보이스 #${iv+1} 번호`); }
+    if(!inv.endUser){ fieldErr($(`#pn-${iv}-eu`),'최종사용자 입력'); errs.push(`인보이스 #${iv+1} 최종사용자`); }
+    if(!inv.items.length){ errs.push(`인보이스 #${iv+1}에 품목이 없습니다.`); }
+    inv.items.forEach((it,k)=>{
+      if(!it.qty){ fieldErr($(`#pn-${iv}-${k}-qty`),'수량 입력'); errs.push(`인보이스 #${iv+1} 품목 ${k+1} 수량`); }
+      if(!it.price){ fieldErr($(`#pn-${iv}-${k}-price`),'단가 입력'); errs.push(`인보이스 #${iv+1} 품목 ${k+1} 단가`); }
+    });
+  });
+  if(errs.length){ $('#pn-err').innerHTML=errSummary(errs); const f=card.querySelector('.input-err'); if(f) f.focus(); return; }
+  state.preDone=true; saveDraft();
   buildSummary(); show('#card-summary'); scrollTo_('#card-summary');
 });
 
@@ -1030,6 +1132,8 @@ function fallbackCopy(text,done){
    STEP 6 : 결과 보고서
    ===================================================================== */
 function buildSummary(){
+  try{ syncEditableDoc(); }catch(e){}
+  saveDraft();
   $('#summary-body').innerHTML = note('ok','✓','아래 버튼으로 보고서를 다운로드하세요. 입력하신 모든 내용과 자동 채워진 양식이 포함됩니다.')+
     `<p class="hint" style="margin-top:8px">생성일: ${today()} · 모델 ${state.models.length}개</p>`;
 }
@@ -1100,7 +1204,7 @@ function reportHTML(){
         const cand=modelCandidates(it.model)[it.candIdx];
         const item=cand?cand.item:it.item; const number=cand?cand.number:it.number;
         const total=(parseFloat(it.qty)||0)*(parseFloat(it.price)||0); sum+=total;
-        return `<tr><td>${esc(item||'-')}</td><td>${esc(it.model)}</td><td>${esc(number||'-')}</td><td>${esc(it.qty||'-')}</td><td>${esc(it.price||'-')}</td><td>${(+total.toFixed(2))}</td><td>${esc(it.paid||'-')}</td></tr>`;
+        return `<tr><td>${esc(item||'-')}</td><td>${esc(it.model)}</td><td>${esc(number||'-')}</td><td>${esc(it.qty||'-')}</td><td>${it.price?fmtUSD(it.price):'-'}</td><td>${fmtUSD(total)}</td><td>${esc(it.paid||'-')}</td></tr>`;
       }).join('');
       parts.push(`<div class="box">
         <table>
@@ -1109,7 +1213,7 @@ function reportHTML(){
         <h4>품목 (${inv.items.length})</h4>
         <table><tr><th>제품명</th><th>모델명</th><th>판정발급번호</th><th>수량(EA)</th><th>단가(USD)</th><th>총액(USD)</th><th>유무상</th></tr>
         ${rows}
-        <tr><th colspan="5" style="text-align:right">합계(USD)</th><td colspan="2"><b>${(+sum.toFixed(2))}</b></td></tr>
+        <tr><th colspan="5" style="text-align:right">합계(USD)</th><td colspan="2"><b>${fmtUSD(sum)}</b></td></tr>
         </table></div>`);
     });
   }
@@ -1178,13 +1282,78 @@ function defaultPrenotifForm(){ return `[사전신고서]
    공통 헬퍼
    ===================================================================== */
 function cssId(s){ return String(s).replace(/[^\w가-힣-]/g,'_'); }
-function show(sel){ $(sel).classList.remove('hide'); }
+function show(sel){ $(sel).classList.remove('hide'); setStep(sel); }
 function scrollTo_(sel){ $(sel).scrollIntoView({behavior:'smooth',block:'start'}); }
+
+/* =====================================================================
+   임시저장 (localStorage) — 새로고침 후에도 이어서 작성
+   ===================================================================== */
+const LS_KEY='catchall_draft_v1';
+function syncEditableDoc(){
+  if($('#form-cl-title') && state.classifyDoc){ state.classifyDoc.title=$('#form-cl-title').value; state.classifyDoc.body=$('#form-cl-body').value; }
+}
+function snapshot(){
+  try{ syncEditableDoc(); }catch(e){}
+  try{ if($('#card-prenotif') && !$('#card-prenotif').classList.contains('hide')) syncInvoices(); }catch(e){}
+  return { ts:Date.now(), modelsText: $('#models')?$('#models').value:'',
+    classify:state.classify, classifyDoc:state.classifyDoc, preInvoices:state.preInvoices, preDone:state.preDone,
+    enduser:state.enduser, indicators:state.indicators, screened:state.screened };
+}
+function saveDraft(){ try{ localStorage.setItem(LS_KEY, JSON.stringify(snapshot())); }catch(e){} }
+let _saveT; function scheduleSave(){ clearTimeout(_saveT); _saveT=setTimeout(saveDraft,600); }
+document.addEventListener('input', scheduleSave, true);
+document.addEventListener('change', scheduleSave, true);
+
+function offerRestore(){
+  let d; try{ d=JSON.parse(localStorage.getItem(LS_KEY)||'null'); }catch(e){ d=null; }
+  if(!d || !d.modelsText) return;
+  const when=new Date(d.ts).toLocaleString('ko-KR');
+  const bar=$('#restorebar');
+  bar.innerHTML=`<div class="inner"><span>이전에 작성하던 내용이 있습니다 <b>(${esc(when)})</b></span>
+    <button class="btn sm primary" id="btn-restore">이어서 작성</button>
+    <button class="btn sm" id="btn-newstart">새로 시작</button></div>`;
+  bar.classList.remove('hide');
+  $('#btn-newstart').addEventListener('click',()=>{ try{localStorage.removeItem(LS_KEY);}catch(e){} bar.classList.add('hide'); });
+  $('#btn-restore').addEventListener('click',()=>{ bar.classList.add('hide'); restoreDraft(d); });
+}
+function restoreDraft(d){
+  $('#models').value=d.modelsText||''; renderModelPreview();
+  if(!doLookup()) return;                 // DB 최신 반영하여 재조회 (sub-state는 초기화됨)
+  state.classify=d.classify||{}; state.classifyDoc=d.classifyDoc||null;
+  state.enduser=d.enduser||state.enduser; state.indicators=d.indicators||[]; state.screened=!!d.screened;
+  state.preInvoices=d.preInvoices||[]; state.preDone=!!d.preDone;
+  if(state.classifyDoc || Object.keys(state.classify).length){
+    buildClassify(); repopulateClassify(); if(state.classifyDoc) renderClassifyDoc(); show('#card-classify');
+  }
+  if(state.screened){ buildScreen(); repopulateScreen(); show('#card-screen'); }
+  if(state.preInvoices.length){ buildPrenotif(); show('#card-prenotif'); }
+  show('#card-results'); scrollTo_('#card-results');
+}
+function repopulateClassify(){
+  state.lookups.filter(L=>!L.found).forEach(L=>{
+    const o=state.classify[L.model]; if(!o) return; const id=cssId(L.model);
+    const set=(suf,v)=>{ const el=$('#cl-'+suf+'-'+id); if(el) el.value=v||''; };
+    set('item',o.item); const hs=$('#cl-hs-'+id); if(hs){ hs.value=o.hs||''; hs.dataset.src=o.hsSource||''; }
+    set('spec',o.spec); set('weight',o.weight); set('purpose',o.purpose);
+    recommendHS(id); markHsNote(id);
+  });
+}
+function repopulateScreen(){
+  const eu=state.enduser||{};
+  const same=$('#eu-same'); if(same){ same.checked=eu.sameForAll!==false; same.dispatchEvent(new Event('change')); }
+  if($('#eu-name')) $('#eu-name').value=eu.name||'';
+  if($('#eu-country')) $('#eu-country').value=eu.country||'';
+  if($('#eu-business')) $('#eu-business').value=eu.business||'';
+  if(eu.perModel) Object.entries(eu.perModel).forEach(([m,v])=>{ const el=$('#eu-name-'+cssId(m)); if(el) el.value=v; });
+  (state.indicators||[]).forEach((v,i)=>{ const cb=$('#ind-'+i); if(cb){ cb.checked=!!v; const lab=cb.closest('label'); if(lab) lab.classList.toggle('checked',!!v); } });
+}
 
 /* 시작 */
 loadAll();
 renderDbStatus();
 renderModelPreview();
+setStep('#card-input');
+offerRestore();
 </script>
 </body>
 </html>
