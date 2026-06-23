@@ -1,0 +1,831 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>수출 판정·사전신고 점검 도구</title>
+<style>
+  :root{
+    --bg:#f4f6f9; --card:#fff; --line:#e2e6ee; --ink:#1f2733; --muted:#697586;
+    --brand:#2456c8; --brand-d:#1c44a0; --ok:#1a8a4b; --warn:#b9770a; --bad:#c23636;
+    --okbg:#e8f6ee; --warnbg:#fdf3e3; --badbg:#fcebeb; --chip:#eef2fb;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--ink);
+    font-family:-apple-system,BlinkMacSystemFont,"Malgun Gothic","맑은 고딕","Apple SD Gothic Neo",sans-serif;
+    line-height:1.55;font-size:15px}
+  header.top{background:linear-gradient(135deg,var(--brand),var(--brand-d));color:#fff;padding:22px 18px}
+  header.top h1{margin:0;font-size:20px}
+  header.top p{margin:6px 0 0;opacity:.92;font-size:13px}
+  .wrap{max-width:920px;margin:0 auto;padding:18px}
+  .card{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:18px;margin:16px 0;
+    box-shadow:0 1px 2px rgba(20,40,80,.04)}
+  .card h2{margin:0 0 4px;font-size:17px}
+  .card h2 .step{display:inline-block;background:var(--brand);color:#fff;border-radius:999px;
+    width:24px;height:24px;line-height:24px;text-align:center;font-size:13px;margin-right:8px;vertical-align:middle}
+  .sub{color:var(--muted);font-size:13px;margin:2px 0 14px}
+  label{display:block;font-weight:600;margin:12px 0 4px;font-size:13.5px}
+  .req:after{content:" *";color:var(--bad)}
+  input[type=text],input[type=number],textarea,select{
+    width:100%;padding:9px 11px;border:1px solid var(--line);border-radius:8px;font-size:14px;
+    font-family:inherit;background:#fff;color:var(--ink)}
+  textarea{min-height:72px;resize:vertical}
+  .hint{font-size:12px;color:var(--muted);margin-top:3px}
+  button{cursor:pointer;border:0;border-radius:8px;font-size:14px;font-family:inherit;padding:10px 16px;font-weight:600}
+  .btn{background:var(--brand);color:#fff}
+  .btn:hover{background:var(--brand-d)}
+  .btn.ghost{background:var(--chip);color:var(--brand)}
+  .btn.sm{padding:6px 11px;font-size:12.5px}
+  .row{display:flex;gap:10px;flex-wrap:wrap}
+  .row>div{flex:1;min-width:180px}
+  .badge{display:inline-block;padding:2px 10px;border-radius:999px;font-size:12px;font-weight:700}
+  .b-ok{background:var(--okbg);color:var(--ok)}
+  .b-warn{background:var(--warnbg);color:var(--warn)}
+  .b-bad{background:var(--badbg);color:var(--bad)}
+  .b-info{background:var(--chip);color:var(--brand)}
+  .note{border-radius:8px;padding:10px 12px;font-size:13px;margin:10px 0}
+  .note.ok{background:var(--okbg);color:#11633a}
+  .note.warn{background:var(--warnbg);color:#8a5a06}
+  .note.bad{background:var(--badbg);color:#962a2a}
+  .modelcard{border:1px solid var(--line);border-radius:10px;padding:14px;margin:12px 0;background:#fcfdff}
+  .modelcard h3{margin:0 0 6px;font-size:15px}
+  .kv{display:flex;flex-wrap:wrap;gap:6px 22px;font-size:13.5px;margin:6px 0}
+  .kv b{color:var(--muted);font-weight:600;margin-right:6px}
+  .chips{display:flex;gap:8px;flex-wrap:wrap;margin:6px 0}
+  .chip{background:var(--chip);color:var(--brand);border-radius:999px;padding:5px 12px;font-size:12.5px;cursor:pointer;border:1px solid #d6e0fb}
+  .chip:hover{background:#dfe8fc}
+  pre.form{white-space:pre-wrap;background:#0f1726;color:#e6edf6;border-radius:8px;padding:14px;font-size:12.5px;
+    font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;overflow:auto;max-height:340px}
+  .hidden{display:none}
+  .ind{display:flex;gap:10px;align-items:flex-start;padding:9px 0;border-bottom:1px dashed var(--line)}
+  .ind:last-child{border-bottom:0}
+  .ind input[type=checkbox]{width:18px;height:18px;margin-top:2px;flex:0 0 auto}
+  .ind .t{font-size:13.5px}
+  .ind .n{font-weight:700;color:var(--brand);margin-right:6px}
+  table{width:100%;border-collapse:collapse;font-size:13px;margin-top:8px}
+  th,td{border:1px solid var(--line);padding:7px 8px;text-align:left;vertical-align:top}
+  th{background:#f3f6fc}
+  .toolbar{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-top:10px}
+  .dbrow{display:flex;justify-content:space-between;gap:10px;font-size:12.5px;padding:4px 0;border-bottom:1px dashed var(--line)}
+  .dbrow:last-child{border-bottom:0}
+  .switch{display:flex;align-items:center;gap:8px;font-weight:600;font-size:13.5px;margin:8px 0}
+  details summary{cursor:pointer;font-weight:600;color:var(--brand)}
+  footer{color:var(--muted);font-size:12px;text-align:center;padding:24px}
+</style>
+</head>
+<body>
+<header class="top">
+  <h1>수출 판정 · 사전신고 점검 도구</h1>
+  <p>모델명을 입력하면 판정정보를 확인하고, 필요한 신청·신고 양식을 자동으로 채워드립니다. 마지막에 결과 보고서를 내려받아 담당자에게 제출하세요.</p>
+</header>
+
+<div class="wrap">
+
+  <!-- ================= DB 상태 ================= -->
+  <div class="card" id="card-db">
+    <h2>DB 탑재 상태</h2>
+    <div class="sub">아래 DB는 <code>data/</code> 폴더의 CSV 파일에서 읽어옵니다. GitHub Pages에 배포하면 자동으로 불러옵니다. (불러오지 못한 경우 파일을 직접 선택할 수 있습니다.)</div>
+    <div id="db-status"></div>
+    <details style="margin-top:10px">
+      <summary>DB를 불러오지 못했나요? 파일 직접 선택</summary>
+      <div class="hint" style="margin:8px 0">로컬에서 <code>file://</code>로 열면 보안정책상 자동 로드가 막힐 수 있습니다. 그럴 땐 아래에서 CSV 파일들을 직접 선택하세요.</div>
+      <div class="row">
+        <div><label>자가판정결과</label><input type="file" accept=".csv" data-load="self"></div>
+        <div><label>전문판정결과</label><input type="file" accept=".csv" data-load="expert"></div>
+      </div>
+      <div class="row">
+        <div><label>키워드-HS 매칭</label><input type="file" accept=".csv" data-load="keywordHs"></div>
+        <div><label>대러 제재대상 품목(HS)</label><input type="file" accept=".csv" data-load="sanctions"></div>
+      </div>
+      <div class="row">
+        <div><label>사전신고 대상(HS)</label><input type="file" accept=".csv" data-load="prenotif"></div>
+      </div>
+    </details>
+  </div>
+
+  <!-- ================= STEP 1: 모델명 입력 ================= -->
+  <div class="card" id="card-input">
+    <h2><span class="step">1</span>모델명 입력</h2>
+    <div class="sub">여러 모델명을 한 번에 입력할 수 있습니다. 쉼표, 띄어쓰기, 탭, 줄바꿈으로 구분하세요.</div>
+    <label>신청자 / 회사명 (선택)</label>
+    <input type="text" id="applicant" placeholder="예: 홍길동 / ○○전자">
+    <label class="req">모델명</label>
+    <textarea id="models" placeholder="예) SM-DEMO-100, SM-DEMO-200&#10;ABC-1000"></textarea>
+    <div class="toolbar">
+      <button class="btn" id="btn-lookup">판정정보 조회</button>
+    </div>
+  </div>
+
+  <!-- ================= STEP 2: 조회 결과 ================= -->
+  <div class="card hidden" id="card-results">
+    <h2><span class="step">2</span>판정정보 조회 결과</h2>
+    <div class="sub">DB의 자가판정/전문판정 결과를 모델별로 확인합니다.</div>
+    <div id="results-body"></div>
+    <div class="toolbar" id="results-next"></div>
+  </div>
+
+  <!-- ================= STEP 3: 판정 신청 ================= -->
+  <div class="card hidden" id="card-classify">
+    <h2><span class="step">3</span>판정 신청 (판정정보가 없는 모델)</h2>
+    <div class="sub">판정 이력이 없는 모델은 판정이 필요합니다. 모델(품목)별로 아래 항목을 입력하세요. 무게는 필수입니다.</div>
+    <div class="note warn">📎 각 모델의 <b>모델명이 포함된 사양서</b>를 반드시 함께 첨부하여 제출하세요.</div>
+    <div id="classify-body"></div>
+    <div class="toolbar"><button class="btn" id="btn-classify-next">다음 (위험 점검)</button></div>
+  </div>
+
+  <!-- ================= STEP 4: 위험 점검 (의심징후 + 최종사용자) ================= -->
+  <div class="card hidden" id="card-screen">
+    <h2><span class="step">4</span>위험 점검 · 상황허가 의심징후</h2>
+    <div class="sub">상황허가 의심징후 점검은 <b>수출 1회당 1번</b> 작성합니다(품목별 아님). 최종사용자 정보를 입력하세요.</div>
+    <div id="sanctions-body"></div>
+
+    <h3 style="margin:16px 0 4px">최종사용자 정보</h3>
+    <div id="enduser-body"></div>
+
+    <h3 style="margin:18px 0 4px">상황허가 의심징후 (12가지)</h3>
+    <div class="hint">해당되는 항목에 체크하세요.</div>
+    <div id="indicators-body"></div>
+    <div class="toolbar"><button class="btn" id="btn-screen-next">다음</button></div>
+  </div>
+
+  <!-- ================= STEP 5: 사전신고 ================= -->
+  <div class="card hidden" id="card-prenotif">
+    <h2><span class="step">5</span>사전신고</h2>
+    <div id="prenotif-intro"></div>
+    <div id="prenotif-body" class="hidden">
+      <div class="row">
+        <div><label class="req">구매자</label><input type="text" id="pn-buyer"></div>
+        <div><label class="req">최종수하인</label><input type="text" id="pn-consignee"></div>
+        <div><label class="req">최종사용자</label><input type="text" id="pn-enduser"></div>
+      </div>
+      <h3 style="margin:16px 0 4px">모델별 수출 내역</h3>
+      <div class="hint">판정번호는 DB에서 자동 매칭됩니다(없으면 비어 있음). 수량·단가(USD)·용도를 입력하세요.</div>
+      <div id="pn-models"></div>
+      <div class="toolbar"><button class="btn" id="btn-prenotif-gen">사전신고서 생성</button></div>
+      <div id="pn-form-out"></div>
+    </div>
+    <div class="toolbar"><button class="btn ghost" id="btn-prenotif-skip">다음 (결과 보고서)</button></div>
+  </div>
+
+  <!-- ================= STEP 6: 결과 보고서 ================= -->
+  <div class="card hidden" id="card-summary">
+    <h2><span class="step">6</span>결과 보고서 다운로드</h2>
+    <div class="sub">아래 내용으로 보고서를 생성합니다. 내려받아 담당자에게 제출하세요.</div>
+    <div id="summary-body"></div>
+    <div class="toolbar">
+      <button class="btn" id="btn-download">결과 보고서(.html) 다운로드</button>
+    </div>
+  </div>
+
+  <footer>본 도구는 사내 수출 판정·사전신고 점검 보조용입니다. 최종 책임은 수출 담당 부서의 검토에 따릅니다.</footer>
+</div>
+
+<script>
+/* =====================================================================
+   설정: DB / 양식 파일 경로
+   ===================================================================== */
+const DATA_FILES = {
+  self:      'data/self_classification.csv',
+  expert:    'data/expert_classification.csv',
+  keywordHs: 'data/keyword_hs.csv',
+  sanctions: 'data/russia_sanctions_hs.csv',
+  prenotif:  'data/prenotification_hs.csv',
+};
+const FORM_FILES = {
+  reclassification: 'forms/reclassification.txt',
+  classification:   'forms/classification_request.txt',
+  prenotification:  'forms/prenotification.txt',
+};
+const DB_LABELS = {
+  self:'자가판정결과', expert:'전문판정결과', keywordHs:'키워드-HS 매칭',
+  sanctions:'대러 제재대상 품목(HS)', prenotif:'사전신고 대상(HS)'
+};
+
+const INDICATORS = [
+  '수입자가 해당 물품등의 최종용도에 관하여 필요한 정보 제공을 기피하는 경우',
+  '해당 물품등이 최종사용자의 사업 분야에 활용되지 아니하는 경우',
+  '해당 물품등이 수입국의 기술수준과 현저한 격차가 있는 경우',
+  '최종사용자가 해당 물품등이 활용될 분야의 사업 경력이 없는 경우',
+  '최종사용자가 해당 물품등에 대한 전문적 지식이 없으면서도 그 물품등의 수출을 요구하는 경우',
+  '최종사용자가 해당 물품등에 대한 설치·보수 또는 교육훈련 서비스를 거부하는 경우',
+  '해당 물품등의 최종수하인이 운송업자인 경우',
+  '해당 물품등에 대한 가격조건이나 지불조건이 통상적인 범위를 벗어나는 경우',
+  '해당 물품등의 납기일이 통상적인 기간을 벗어난 경우',
+  '해당 물품등의 수송경로가 통상적인 경로를 벗어난 경우',
+  '해당 물품등의 수입국 내 사용 또는 재수출 여부가 명백하지 아니한 경우',
+  '해당 물품등에 대한 정보나 목적지 등에 대하여 통상적인 범위를 벗어나는 보안을 요구하는 경우',
+];
+
+/* =====================================================================
+   전역 상태
+   ===================================================================== */
+const DB = { self:[], expert:[], keywordHs:[], sanctions:[], prenotif:[] };
+const FORMS = { reclassification:'', classification:'', prenotification:'' };
+const dbLoaded = { self:false, expert:false, keywordHs:false, sanctions:false, prenotif:false };
+
+const state = {
+  applicant:'',
+  models:[],          // 입력된 모델명 목록
+  lookups:[],         // {model, found, type, result, number, expiry, item, expired}
+  classify:{},        // model -> {item,hs,recHs:[],usedRec,noHsMatch,spec,weight,purpose,specOk}
+  enduser:{ name:'', country:'', business:'', sameForAll:true },
+  indicators:[],      // bool[12]
+  sanctionsHits:[],   // [{model,hs,desc}]
+  prenotifModels:[],  // [{model,hs}]  사전신고 대상
+  prenotif:{ buyer:'',consignee:'',enduser:'', rows:[] },
+};
+
+/* =====================================================================
+   유틸
+   ===================================================================== */
+const $ = (s,root=document)=>root.querySelector(s);
+const $$ = (s,root=document)=>[...root.querySelectorAll(s)];
+const esc = s => String(s==null?'':s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+const today = () => new Date().toISOString().slice(0,10);
+
+// CSV 파서 (따옴표/쉼표 처리). 첫 줄을 헤더로 사용하여 객체 배열 반환.
+function parseCSV(text){
+  text = text.replace(/^﻿/,'').replace(/\r\n?/g,'\n');
+  const rows=[]; let row=[], cur='', q=false;
+  for(let i=0;i<text.length;i++){
+    const ch=text[i];
+    if(q){
+      if(ch==='"'){ if(text[i+1]==='"'){cur+='"';i++;} else q=false; }
+      else cur+=ch;
+    } else {
+      if(ch==='"') q=true;
+      else if(ch===','){ row.push(cur); cur=''; }
+      else if(ch==='\n'){ row.push(cur); rows.push(row); row=[]; cur=''; }
+      else cur+=ch;
+    }
+  }
+  if(cur!==''||row.length){ row.push(cur); rows.push(row); }
+  const clean = rows.filter(r=>r.some(c=>String(c).trim()!==''));
+  if(!clean.length) return [];
+  const headers = clean[0].map(h=>h.trim());
+  return clean.slice(1).map(r=>{
+    const o={}; headers.forEach((h,i)=>o[h]=(r[i]||'').trim()); return o;
+  });
+}
+// 헤더 별칭으로 값 읽기
+function field(obj, aliases){
+  for(const a of aliases){ if(obj[a]!=null && obj[a]!=='') return obj[a]; }
+  return '';
+}
+const F = {
+  model:r=>field(r,['모델명','model','Model']),
+  item: r=>field(r,['품목명','물품명','item']),
+  result:r=>field(r,['판정결과','result']),
+  number:r=>field(r,['판정번호','number']),
+  expiry:r=>field(r,['유효기한','유효기간','expiry']),
+  keyword:r=>field(r,['키워드','keyword']),
+  hs:r=>field(r,['HS코드','HS','hs','HSK']),
+  desc:r=>field(r,['품목설명','설명','desc']),
+};
+const normHS = s => String(s||'').replace(/[^0-9]/g,'');
+// HS 접두 매칭 (어느 한 쪽이 다른 쪽의 접두면 매칭, 최소 4자리)
+function hsMatch(a,b){ a=normHS(a); b=normHS(b);
+  if(a.length<4||b.length<4) return false;
+  return a.startsWith(b)||b.startsWith(a); }
+
+/* =====================================================================
+   DB / 양식 로드
+   ===================================================================== */
+function ingest(key, text){
+  const rows = parseCSV(text);
+  DB[key]=rows; dbLoaded[key]=true; renderDbStatus();
+}
+async function loadAll(){
+  await Promise.all(Object.entries(DATA_FILES).map(async ([k,path])=>{
+    try{ const r=await fetch(path,{cache:'no-store'}); if(r.ok) ingest(k, await r.text()); }
+    catch(e){ /* file:// 등에서 실패 가능 */ }
+  }));
+  await Promise.all(Object.entries(FORM_FILES).map(async ([k,path])=>{
+    try{ const r=await fetch(path,{cache:'no-store'}); if(r.ok) FORMS[k]=await r.text(); }
+    catch(e){}
+  }));
+  renderDbStatus();
+}
+function renderDbStatus(){
+  $('#db-status').innerHTML = Object.keys(DATA_FILES).map(k=>{
+    const ok=dbLoaded[k];
+    return `<div class="dbrow"><span>${DB_LABELS[k]}</span>
+      <span class="badge ${ok?'b-ok':'b-warn'}">${ok?`로드됨 (${DB[k].length}건)`:'미로드'}</span></div>`;
+  }).join('');
+}
+// 직접 파일 선택
+$$('input[data-load]').forEach(inp=>{
+  inp.addEventListener('change', e=>{
+    const f=e.target.files[0]; if(!f) return;
+    const rd=new FileReader();
+    rd.onload=()=>{ ingest(inp.dataset.load, rd.result); };
+    rd.readAsText(f,'utf-8');
+  });
+});
+
+/* =====================================================================
+   STEP 1 -> 2 : 모델명 조회
+   ===================================================================== */
+$('#btn-lookup').addEventListener('click', ()=>{
+  const raw = $('#models').value || '';
+  const models = [...new Set(raw.split(/[\s,\t\n]+/).map(s=>s.trim()).filter(Boolean))];
+  if(!models.length){ alert('모델명을 1개 이상 입력하세요.'); return; }
+  state.applicant = $('#applicant').value.trim();
+  state.models = models;
+  state.lookups = models.map(lookupModel);
+  renderResults();
+  show('#card-results'); scrollTo_('#card-results');
+});
+
+function lookupModel(model){
+  const m = model.toLowerCase();
+  const find = arr => arr.find(r=>F.model(r).toLowerCase()===m);
+  let hit = find(DB.expert), type='전문판정';
+  if(!hit){ hit = find(DB.self); type='자가판정'; }
+  if(!hit) return { model, found:false };
+  const expiry = F.expiry(hit);
+  const expired = expiry && expiry < today();
+  return { model, found:true, type, result:F.result(hit), number:F.number(hit),
+           expiry, item:F.item(hit), expired:!!expired };
+}
+
+function renderResults(){
+  const body = $('#results-body'); body.innerHTML='';
+  state.lookups.forEach(L=>{
+    const c=document.createElement('div'); c.className='modelcard';
+    if(!L.found){
+      c.innerHTML = `<h3>${esc(L.model)} <span class="badge b-info">판정정보 없음</span></h3>
+        <div class="note warn">이 모델은 판정 이력이 없습니다. <b>판정이 필요</b>합니다. (아래 STEP 3에서 신청 정보를 입력하세요.)</div>`;
+    } else if(L.expired){
+      c.innerHTML = `<h3>${esc(L.model)} <span class="badge b-bad">만료됨 · 재판정 필요</span></h3>
+        ${kvBlock(L)}
+        <div class="note bad">유효기한(${esc(L.expiry)})이 지났습니다. 아래 <b>재판정 요청서</b>로 재판정을 요청하세요. (만료된 판정번호 포함)</div>
+        ${formBlock(fillForm(FORMS.reclassification || defaultReclassForm(), {
+            '판정번호':L.number,'모델명':L.model,'품목명':L.item,'판정종류':L.type,
+            '판정결과':L.result,'유효기한':L.expiry,'오늘':today()
+        }), 're-'+cssId(L.model))}`;
+    } else {
+      c.innerHTML = `<h3>${esc(L.model)} <span class="badge b-ok">유효</span></h3>${kvBlock(L)}
+        <div class="note ok">유효한 판정입니다. 유효기한: <b>${esc(L.expiry||'-')}</b></div>`;
+    }
+    body.appendChild(c);
+  });
+  // 다음 단계 안내
+  const needClassify = state.lookups.filter(L=>!L.found);
+  const nx = $('#results-next'); nx.innerHTML='';
+  if(needClassify.length){
+    nx.innerHTML = `<button class="btn" id="btn-to-classify">판정 신청 진행 (${needClassify.length}개 모델)</button>`;
+    $('#btn-to-classify').addEventListener('click', ()=>{ buildClassify(); show('#card-classify'); scrollTo_('#card-classify'); });
+  } else {
+    nx.innerHTML = `<button class="btn" id="btn-to-summary">결과 보고서로 이동</button>`;
+    $('#btn-to-summary').addEventListener('click', ()=>{ buildSummary(); show('#card-summary'); scrollTo_('#card-summary'); });
+  }
+  bindCopy(body);
+}
+function kvBlock(L){
+  return `<div class="kv"><span><b>판정종류</b>${esc(L.type)}</span>
+    <span><b>판정결과</b>${esc(L.result)}</span>
+    <span><b>판정번호</b>${esc(L.number||'-')}</span>
+    <span><b>유효기한</b>${esc(L.expiry||'-')}</span>
+    ${L.item?`<span><b>품목명</b>${esc(L.item)}</span>`:''}</div>`;
+}
+
+/* =====================================================================
+   STEP 3 : 판정 신청 입력 (모델별)
+   ===================================================================== */
+function buildClassify(){
+  const body=$('#classify-body'); body.innerHTML='';
+  state.lookups.filter(L=>!L.found).forEach(L=>{
+    const id=cssId(L.model);
+    state.classify[L.model] = state.classify[L.model] || {};
+    const c=document.createElement('div'); c.className='modelcard'; c.dataset.model=L.model;
+    c.innerHTML = `
+      <h3>${esc(L.model)}</h3>
+      <label class="req">물품명</label>
+      <input type="text" data-f="item" id="cl-item-${id}">
+      <label>HS코드 추천받기 (키워드 입력)</label>
+      <div class="row">
+        <div><input type="text" id="cl-kw-${id}" placeholder="예: 센서, 통신, 제어"></div>
+        <div style="flex:0 0 auto"><button class="btn ghost sm" data-rec="${id}">추천</button></div>
+      </div>
+      <div class="chips" id="cl-recwrap-${id}"></div>
+      <label class="req">HS코드 (한국 수출기준)</label>
+      <input type="text" data-f="hs" id="cl-hs-${id}" placeholder="예: 9031.80-9099">
+      <div class="hint" id="cl-hsnote-${id}"></div>
+      <label class="req">사양 및 규격 (무게 필수 + 자유 기재)</label>
+      <div class="row">
+        <div style="flex:0 0 220px"><input type="text" data-f="weight" id="cl-w-${id}" placeholder="무게 (필수) 예: 2.5kg"></div>
+        <div><input type="text" data-f="spec" id="cl-spec-${id}" placeholder="기타 사양·규격 자유 기재"></div>
+      </div>
+      <label class="req">용도</label>
+      <input type="text" data-f="purpose" id="cl-purpose-${id}">
+      <label class="switch"><input type="checkbox" data-f="specOk" id="cl-specok-${id}"> 모델명이 포함된 사양서를 함께 첨부하겠습니다</label>
+    `;
+    body.appendChild(c);
+  });
+  // 추천 버튼
+  $$('button[data-rec]', body).forEach(b=>b.addEventListener('click',()=>recommendHS(b.dataset.rec)));
+  // HS 입력시 추천 사용여부/매칭 표시
+  $$('input[id^="cl-hs-"]', body).forEach(inp=>inp.addEventListener('input', ()=>{
+    const id=inp.id.replace('cl-hs-',''); markHsNote(id);
+  }));
+}
+function recommendHS(id){
+  const kw = $('#cl-kw-'+id).value.trim();
+  const item = $('#cl-item-'+id).value.trim();
+  const q = (kw+' '+item).toLowerCase();
+  const wrap = $('#cl-recwrap-'+id); wrap.innerHTML='';
+  const matches = DB.keywordHs.filter(r=>{
+    const k=F.keyword(r).toLowerCase(); const d=F.desc(r).toLowerCase();
+    return k && (q.includes(k) || (kw && k.includes(kw.toLowerCase())) || (d && q && d.split(/\s+/).some(w=>w&&q.includes(w))));
+  });
+  if(!matches.length){
+    wrap.innerHTML = `<span class="badge b-warn">매칭되는 추천 HS가 없습니다 — 위험 점검(STEP 4)이 필요합니다</span>`;
+    return;
+  }
+  const seen=new Set();
+  matches.forEach(r=>{
+    const hs=F.hs(r); if(seen.has(hs))return; seen.add(hs);
+    const chip=document.createElement('span'); chip.className='chip';
+    chip.textContent = `${hs} · ${F.desc(r)}`;
+    chip.addEventListener('click',()=>{ $('#cl-hs-'+id).value=hs; markHsNote(id); });
+    wrap.appendChild(chip);
+  });
+}
+function recListFor(id){
+  const kw = $('#cl-kw-'+id) ? $('#cl-kw-'+id).value.trim() : '';
+  const item = $('#cl-item-'+id) ? $('#cl-item-'+id).value.trim() : '';
+  const q=(kw+' '+item).toLowerCase();
+  return DB.keywordHs.filter(r=>{ const k=F.keyword(r).toLowerCase();
+    return k && (q.includes(k)||(kw&&k.includes(kw.toLowerCase()))); }).map(r=>F.hs(r));
+}
+function markHsNote(id){
+  const hs=$('#cl-hs-'+id).value.trim();
+  const recs=recListFor(id);
+  const note=$('#cl-hsnote-'+id);
+  if(!hs){ note.innerHTML=''; return; }
+  if(recs.length && recs.some(r=>hsMatch(r,hs))){
+    note.innerHTML=`<span class="badge b-ok">추천 HS 사용</span>`;
+  } else if(recs.length){
+    note.innerHTML=`<span class="badge b-warn">추천 HS 미사용 — 보고서에 표시됩니다</span>`;
+  } else {
+    note.innerHTML=`<span class="badge b-info">추천 결과 없음 (위험 점검 대상)</span>`;
+  }
+}
+
+$('#btn-classify-next').addEventListener('click', ()=>{
+  // 입력 수집/검증
+  for(const L of state.lookups.filter(x=>!x.found)){
+    const id=cssId(L.model);
+    const o={
+      item: $('#cl-item-'+id).value.trim(),
+      hs: $('#cl-hs-'+id).value.trim(),
+      weight: $('#cl-w-'+id).value.trim(),
+      spec: $('#cl-spec-'+id).value.trim(),
+      purpose: $('#cl-purpose-'+id).value.trim(),
+      specOk: $('#cl-specok-'+id).checked,
+      recHs: recListFor(id),
+    };
+    if(!o.item||!o.hs||!o.weight||!o.purpose){
+      alert(`[${L.model}] 물품명, HS코드, 무게, 용도는 필수입니다.`); return;
+    }
+    o.usedRec = o.recHs.length ? o.recHs.some(r=>hsMatch(r,o.hs)) : null; // null=추천없음
+    o.noHsMatch = (o.recHs.length===0);
+    state.classify[L.model]=o;
+  }
+  buildScreen();
+  show('#card-screen'); scrollTo_('#card-screen');
+});
+
+/* =====================================================================
+   STEP 4 : 위험 점검 (대러 제재 / 의심징후 / 최종사용자)
+   ===================================================================== */
+function buildScreen(){
+  // 대러 제재대상(HS) 점검 — 판정이력 없는 모델 대상
+  state.sanctionsHits=[]; state.prenotifModels=[];
+  const sb=$('#sanctions-body'); sb.innerHTML='';
+  state.lookups.filter(L=>!L.found).forEach(L=>{
+    const o=state.classify[L.model]; if(!o) return;
+    const sHit = DB.sanctions.find(r=>hsMatch(o.hs, F.hs(r)));
+    const pHit = DB.prenotif.find(r=>hsMatch(o.hs, F.hs(r)));
+    if(sHit) state.sanctionsHits.push({model:L.model, hs:o.hs, desc:F.desc(sHit)});
+    if(pHit) state.prenotifModels.push({model:L.model, hs:o.hs});
+    const lines=[];
+    if(o.noHsMatch) lines.push(`<div class="note warn">추천 HS 매칭 결과가 없어 위험 점검이 필요합니다.</div>`);
+    if(sHit) lines.push(`<div class="note bad"><b>대러 제재대상 품목 가능성이 높습니다.</b> (HS ${esc(o.hs)} · ${esc(F.desc(sHit))})</div>`);
+    if(pHit) lines.push(`<div class="note bad">사전신고 대상 HS에 해당합니다 — STEP 5에서 사전신고서를 작성하세요.</div>`);
+    if(!sHit && !pHit && !o.noHsMatch) lines.push(`<div class="note ok">대러 제재대상/사전신고 대상 HS에 매칭되지 않았습니다.</div>`);
+    const c=document.createElement('div'); c.className='modelcard';
+    c.innerHTML=`<h3>${esc(L.model)} <span class="badge b-info">HS ${esc(o.hs)}</span></h3>${lines.join('')}`;
+    sb.appendChild(c);
+  });
+
+  // 최종사용자
+  const eb=$('#enduser-body');
+  eb.innerHTML=`
+    <label class="switch"><input type="checkbox" id="eu-same" checked> 모든 품목에 동일한 최종사용자 적용</label>
+    <div class="row">
+      <div><label class="req">최종사용자(상호)</label><input type="text" id="eu-name"></div>
+      <div><label>수입국</label><input type="text" id="eu-country"></div>
+    </div>
+    <label>사업 분야 / 활용 분야</label>
+    <input type="text" id="eu-business">
+    <div id="eu-per" class="hidden"></div>`;
+  const per=$('#eu-per');
+  per.innerHTML = state.lookups.filter(L=>!L.found).map(L=>{
+    const id=cssId(L.model);
+    return `<div class="modelcard"><h3>${esc(L.model)} 의 최종사용자</h3>
+      <input type="text" id="eu-name-${id}" placeholder="최종사용자(상호)"></div>`;
+  }).join('');
+  $('#eu-same').addEventListener('change',e=>{
+    per.classList.toggle('hidden', e.target.checked);
+  });
+
+  // 의심징후 12
+  $('#indicators-body').innerHTML = INDICATORS.map((t,i)=>`
+    <label class="ind"><input type="checkbox" id="ind-${i}">
+      <span class="t"><span class="n">#${i+1}</span>${esc(t)}</span></label>`).join('');
+}
+
+$('#btn-screen-next').addEventListener('click', ()=>{
+  const same=$('#eu-same').checked;
+  state.enduser={ sameForAll:same,
+    name:$('#eu-name').value.trim(), country:$('#eu-country').value.trim(),
+    business:$('#eu-business').value.trim(), perModel:{} };
+  if(!state.enduser.name && same){ alert('최종사용자(상호)를 입력하세요.'); return; }
+  if(!same){
+    state.lookups.filter(L=>!L.found).forEach(L=>{
+      const id=cssId(L.model); state.enduser.perModel[L.model]=$('#eu-name-'+id).value.trim();
+    });
+  }
+  state.indicators = INDICATORS.map((_,i)=>$('#ind-'+i).checked);
+
+  buildPrenotif();
+  show('#card-prenotif'); scrollTo_('#card-prenotif');
+});
+
+/* =====================================================================
+   STEP 5 : 사전신고
+   ===================================================================== */
+function buildPrenotif(){
+  const intro=$('#prenotif-intro'); const body=$('#prenotif-body');
+  if(!state.prenotifModels.length){
+    intro.innerHTML=`<div class="note ok">사전신고 대상 HS에 해당하는 모델이 없어 사전신고가 필요하지 않습니다.</div>`;
+    body.classList.add('hidden');
+    return;
+  }
+  intro.innerHTML=`<div class="note bad">다음 모델이 <b>사전신고 대상 HS</b>에 해당합니다:
+    ${state.prenotifModels.map(p=>`${esc(p.model)}(${esc(p.hs)})`).join(', ')}</div>`;
+  body.classList.remove('hidden');
+  // 최종사용자 기본값 채우기
+  $('#pn-enduser').value = state.enduser.name || '';
+  // 모델별 입력 행
+  $('#pn-models').innerHTML = `<table><thead><tr>
+      <th>모델명</th><th>판정번호(자동)</th><th>수량</th><th>단가(USD)</th><th>용도</th></tr></thead>
+      <tbody>${state.prenotifModels.map(p=>{
+        const id=cssId(p.model);
+        const num = matchedNumber(p.model);
+        return `<tr>
+          <td>${esc(p.model)}</td>
+          <td>${esc(num||'-')}<input type="hidden" id="pn-num-${id}" value="${esc(num||'')}"></td>
+          <td><input type="number" id="pn-qty-${id}" min="0" style="width:90px"></td>
+          <td><input type="number" id="pn-price-${id}" min="0" step="0.01" style="width:110px"></td>
+          <td><input type="text" id="pn-use-${id}"></td></tr>`;
+      }).join('')}</tbody></table>`;
+}
+function matchedNumber(model){
+  const L=state.lookups.find(x=>x.model===model);
+  if(L && L.found) return L.number;
+  // DB 재조회(판정이력 없는 경우 보통 없음)
+  const m=model.toLowerCase();
+  const hit = DB.expert.find(r=>F.model(r).toLowerCase()===m) || DB.self.find(r=>F.model(r).toLowerCase()===m);
+  return hit?F.number(hit):'';
+}
+
+$('#btn-prenotif-gen').addEventListener('click', ()=>{
+  state.prenotif.buyer=$('#pn-buyer').value.trim();
+  state.prenotif.consignee=$('#pn-consignee').value.trim();
+  state.prenotif.enduser=$('#pn-enduser').value.trim();
+  if(!state.prenotif.buyer||!state.prenotif.consignee||!state.prenotif.enduser){
+    alert('구매자, 최종수하인, 최종사용자는 필수입니다.'); return;
+  }
+  state.prenotif.rows = state.prenotifModels.map(p=>{
+    const id=cssId(p.model);
+    return { model:p.model, number:$('#pn-num-'+id).value,
+      qty:$('#pn-qty-'+id).value, price:$('#pn-price-'+id).value, use:$('#pn-use-'+id).value.trim() };
+  });
+  const modelTable = state.prenotif.rows.map(r=>
+    ` - ${r.model} | 판정번호:${r.number||'-'} | 수량:${r.qty||'-'} | 단가(USD):${r.price||'-'} | 용도:${r.use||'-'}`).join('\n');
+  const indText = INDICATORS.map((t,i)=>`#${i+1} [${state.indicators[i]?'해당':'비해당'}] ${t}`).join('\n');
+  const filled = fillForm(FORMS.prenotification || defaultPrenotifForm(), {
+    '구매자':state.prenotif.buyer,'최종수하인':state.prenotif.consignee,'최종사용자':state.prenotif.enduser,
+    '모델목록':modelTable,'의심징후체크결과':indText,'오늘':today()
+  });
+  $('#pn-form-out').innerHTML = formBlock(filled,'pn-form');
+  bindCopy($('#pn-form-out'));
+});
+
+$('#btn-prenotif-skip').addEventListener('click', ()=>{ buildSummary(); show('#card-summary'); scrollTo_('#card-summary'); });
+
+/* =====================================================================
+   양식 치환 / 복사 / 표시
+   ===================================================================== */
+function fillForm(tpl, map){
+  let out=tpl||'';
+  // 주석(※ ... ) 라인 제거
+  out = out.split('\n').filter(l=>!/^\s*※/.test(l)).join('\n').trim();
+  for(const [k,v] of Object.entries(map)){
+    out = out.split('{'+k+'}').join(v==null||v===''?'':v);
+  }
+  // 미치환 변수 표시
+  out = out.replace(/\{[^}]+\}/g,'(미입력)');
+  return out;
+}
+function formBlock(text, id){
+  return `<div class="toolbar"><button class="btn ghost sm" data-copy="${id}">양식 복사</button></div>
+    <pre class="form" id="form-${id}">${esc(text)}</pre>`;
+}
+function bindCopy(root){
+  $$('button[data-copy]', root).forEach(b=>{
+    b.addEventListener('click', ()=>{
+      const pre=$('#form-'+b.dataset.copy); if(!pre) return;
+      copyText(pre.textContent, b);
+    });
+  });
+}
+function copyText(text, btn){
+  const done=()=>{ if(btn){const t=btn.textContent; btn.textContent='복사됨 ✓'; setTimeout(()=>btn.textContent=t,1500);} };
+  if(navigator.clipboard && navigator.clipboard.writeText){
+    navigator.clipboard.writeText(text).then(done,()=>fallbackCopy(text,done));
+  } else fallbackCopy(text,done);
+}
+function fallbackCopy(text,done){
+  const ta=document.createElement('textarea'); ta.value=text;
+  ta.style.position='fixed'; ta.style.opacity='0'; document.body.appendChild(ta);
+  ta.select(); try{document.execCommand('copy');}catch(e){} document.body.removeChild(ta); done&&done();
+}
+
+/* =====================================================================
+   STEP 6 : 결과 보고서
+   ===================================================================== */
+function buildSummary(){
+  $('#summary-body').innerHTML = `<div class="note ok">아래 버튼으로 보고서를 다운로드하세요. 입력하신 모든 내용과 자동 채워진 양식이 포함됩니다.</div>
+    <div class="hint">신청자: ${esc(state.applicant||'-')} · 생성일: ${today()} · 모델 ${state.models.length}개</div>`;
+}
+
+function reportHTML(){
+  const parts=[];
+  parts.push(`<h1>수출 판정 · 사전신고 점검 결과 보고서</h1>`);
+  parts.push(`<p class="meta">신청자/회사명: <b>${esc(state.applicant||'-')}</b> · 작성일: <b>${today()}</b></p>`);
+
+  // 1. 모델 조회 결과
+  parts.push(`<h2>1. 모델별 판정정보 조회 결과</h2>`);
+  state.lookups.forEach(L=>{
+    if(!L.found){ parts.push(`<div class="box"><h3>${esc(L.model)} — 판정정보 없음 (판정 필요)</h3></div>`); return; }
+    parts.push(`<div class="box"><h3>${esc(L.model)} — ${L.expired?'만료됨 (재판정 필요)':'유효'}</h3>
+      <table>
+      <tr><th>판정종류</th><td>${esc(L.type)}</td><th>판정결과</th><td>${esc(L.result)}</td></tr>
+      <tr><th>판정번호</th><td>${esc(L.number||'-')}</td><th>유효기한</th><td>${esc(L.expiry||'-')}</td></tr>
+      ${L.item?`<tr><th>품목명</th><td colspan="3">${esc(L.item)}</td></tr>`:''}
+      </table>
+      ${L.expired?`<h4>재판정 요청서</h4><pre>${esc(fillForm(FORMS.reclassification||defaultReclassForm(),{
+        '판정번호':L.number,'모델명':L.model,'품목명':L.item,'판정종류':L.type,
+        '판정결과':L.result,'유효기한':L.expiry,'오늘':today()}))}</pre>`:''}
+      </div>`);
+  });
+
+  // 2. 판정 신청
+  const nc=state.lookups.filter(L=>!L.found);
+  if(nc.length){
+    parts.push(`<h2>2. 판정 신청 내역</h2>`);
+    nc.forEach(L=>{
+      const o=state.classify[L.model]||{};
+      const recTxt = o.recHs&&o.recHs.length? o.recHs.join(', '):'(추천 결과 없음)';
+      const usedTxt = o.usedRec===null?'추천 결과 없음':(o.usedRec?'추천 HS 사용':'추천 HS 미사용 ⚠');
+      parts.push(`<div class="box"><h3>${esc(L.model)}</h3>
+        <table>
+        <tr><th>물품명</th><td>${esc(o.item)}</td><th>HS코드</th><td>${esc(o.hs)}</td></tr>
+        <tr><th>추천 HS</th><td>${esc(recTxt)}</td><th>추천 사용여부</th><td>${esc(usedTxt)}</td></tr>
+        <tr><th>무게</th><td>${esc(o.weight)}</td><th>용도</th><td>${esc(o.purpose)}</td></tr>
+        <tr><th>사양 및 규격</th><td colspan="3">${esc(o.spec||'-')}</td></tr>
+        <tr><th>사양서 첨부</th><td colspan="3">${o.specOk?'첨부 예정 (모델명 포함)':'⚠ 미확인'}</td></tr>
+        </table>
+        <h4>판정 신청서</h4><pre>${esc(fillForm(FORMS.classification||defaultClassifyForm(),{
+          'HS코드':o.hs,'추천HS':recTxt,'추천사용여부':usedTxt,'물품명':o.item,'모델명':L.model,
+          '사양및규격':o.spec,'무게':o.weight,'용도':o.purpose,
+          '사양서첨부':o.specOk?'예':'아니오','오늘':today()}))}</pre>
+        </div>`);
+    });
+
+    // 3. 위험 점검
+    parts.push(`<h2>3. 위험 점검 (대러 제재 / 최종사용자 / 의심징후)</h2>`);
+    if(state.sanctionsHits.length){
+      parts.push(`<div class="box bad"><b>대러 제재대상 품목 가능성:</b><ul>${
+        state.sanctionsHits.map(h=>`<li>${esc(h.model)} (HS ${esc(h.hs)}) — ${esc(h.desc)}</li>`).join('')}</ul></div>`);
+    } else {
+      parts.push(`<div class="box">대러 제재대상 HS 매칭: 없음</div>`);
+    }
+    parts.push(`<div class="box"><h3>최종사용자</h3>${
+      state.enduser.sameForAll
+        ? `<table><tr><th>최종사용자</th><td>${esc(state.enduser.name)}</td><th>수입국</th><td>${esc(state.enduser.country||'-')}</td></tr>
+           <tr><th>사업분야</th><td colspan="3">${esc(state.enduser.business||'-')}</td></tr></table><p>(모든 품목 동일 적용)</p>`
+        : `<table>${Object.entries(state.enduser.perModel||{}).map(([m,n])=>`<tr><th>${esc(m)}</th><td>${esc(n||'-')}</td></tr>`).join('')}</table>`
+    }</div>`);
+    parts.push(`<div class="box"><h3>상황허가 의심징후 (12가지) — 수출 1회 기준</h3>
+      <table><tr><th>#</th><th>항목</th><th>해당</th></tr>
+      ${INDICATORS.map((t,i)=>`<tr><td>${i+1}</td><td>${esc(t)}</td><td>${state.indicators[i]?'<b>해당</b>':'비해당'}</td></tr>`).join('')}
+      </table></div>`);
+  }
+
+  // 4. 사전신고
+  if(state.prenotifModels.length && state.prenotif.rows.length){
+    parts.push(`<h2>4. 사전신고</h2>
+      <div class="box"><table>
+      <tr><th>구매자</th><td>${esc(state.prenotif.buyer)}</td></tr>
+      <tr><th>최종수하인</th><td>${esc(state.prenotif.consignee)}</td></tr>
+      <tr><th>최종사용자</th><td>${esc(state.prenotif.enduser)}</td></tr></table>
+      <h4>모델별 수출 내역</h4>
+      <table><tr><th>모델명</th><th>판정번호</th><th>수량</th><th>단가(USD)</th><th>용도</th></tr>
+      ${state.prenotif.rows.map(r=>`<tr><td>${esc(r.model)}</td><td>${esc(r.number||'-')}</td><td>${esc(r.qty||'-')}</td><td>${esc(r.price||'-')}</td><td>${esc(r.use||'-')}</td></tr>`).join('')}
+      </table>
+      <h4>사전신고서</h4><pre>${esc(fillForm(FORMS.prenotification||defaultPrenotifForm(),{
+        '구매자':state.prenotif.buyer,'최종수하인':state.prenotif.consignee,'최종사용자':state.prenotif.enduser,
+        '모델목록':state.prenotif.rows.map(r=>` - ${r.model} | 판정번호:${r.number||'-'} | 수량:${r.qty||'-'} | 단가(USD):${r.price||'-'} | 용도:${r.use||'-'}`).join('\n'),
+        '의심징후체크결과':INDICATORS.map((t,i)=>`#${i+1} [${state.indicators[i]?'해당':'비해당'}] ${t}`).join('\n'),
+        '오늘':today()}))}</pre></div>`);
+  } else if(state.prenotifModels.length){
+    parts.push(`<h2>4. 사전신고</h2><div class="box">사전신고 대상이나 신고서가 작성되지 않았습니다.</div>`);
+  }
+
+  const style=`<style>
+    body{font-family:-apple-system,"Malgun Gothic",sans-serif;color:#1f2733;max-width:820px;margin:30px auto;padding:0 18px;line-height:1.55}
+    h1{font-size:22px;border-bottom:3px solid #2456c8;padding-bottom:8px}
+    h2{font-size:17px;margin-top:26px;border-left:4px solid #2456c8;padding-left:8px}
+    h3{font-size:15px;margin:0 0 8px} h4{margin:12px 0 4px}
+    .meta{color:#697586} .box{border:1px solid #e2e6ee;border-radius:8px;padding:12px 14px;margin:10px 0}
+    .box.bad{background:#fcebeb;border-color:#f0caca}
+    table{width:100%;border-collapse:collapse;font-size:13px;margin:6px 0}
+    th,td{border:1px solid #e2e6ee;padding:6px 8px;text-align:left} th{background:#f3f6fc;white-space:nowrap}
+    pre{white-space:pre-wrap;background:#f7f9fc;border:1px solid #e2e6ee;border-radius:8px;padding:12px;font-size:12.5px}
+    @media print{.box{break-inside:avoid}}
+  </style>`;
+  return `<!DOCTYPE html><html lang="ko"><head><meta charset="UTF-8">
+    <title>수출 판정·사전신고 점검 결과 보고서</title>${style}</head><body>${parts.join('\n')}
+    <p style="color:#697586;font-size:12px;margin-top:30px">본 보고서는 점검 보조용이며 최종 책임은 수출 담당 부서 검토에 따릅니다.</p>
+    </body></html>`;
+}
+
+$('#btn-download').addEventListener('click', ()=>{
+  const html=reportHTML();
+  const blob=new Blob([html],{type:'text/html;charset=utf-8'});
+  const a=document.createElement('a');
+  const safe=(state.applicant||'수출점검').replace(/[^\w가-힣]+/g,'_');
+  a.href=URL.createObjectURL(blob);
+  a.download=`수출점검결과_${safe}_${today()}.html`;
+  document.body.appendChild(a); a.click(); document.body.removeChild(a);
+  setTimeout(()=>URL.revokeObjectURL(a.href),2000);
+});
+
+/* =====================================================================
+   기본 양식 (forms/*.txt 미로드시 폴백)
+   ===================================================================== */
+function defaultReclassForm(){ return `[재판정 요청서]
+작성일자: {오늘}
+만료된 판정번호: {판정번호}
+판정종류: {판정종류}
+모델명: {모델명}
+품목명: {품목명}
+기존 판정결과: {판정결과}
+기존 유효기한: {유효기한}
+위 판정이 만료되어 재판정을 요청합니다.`; }
+function defaultClassifyForm(){ return `[판정 신청서]
+작성일자: {오늘}
+HS코드(한국 수출기준): {HS코드}  (추천 HS: {추천HS} / 추천 사용여부: {추천사용여부})
+물품명: {물품명}
+모델명: {모델명}
+사양 및 규격: {사양및규격} (무게: {무게})
+용도: {용도}
+사양서(모델명 포함) 첨부: {사양서첨부}`; }
+function defaultPrenotifForm(){ return `[사전신고서]
+작성일자: {오늘}
+구매자: {구매자}
+최종수하인: {최종수하인}
+최종사용자: {최종사용자}
+수출 물품 내역:
+{모델목록}
+상황허가 의심징후(12가지):
+{의심징후체크결과}`; }
+
+/* =====================================================================
+   공통 헬퍼
+   ===================================================================== */
+function cssId(s){ return String(s).replace(/[^\w가-힣-]/g,'_'); }
+function show(sel){ $(sel).classList.remove('hidden'); }
+function scrollTo_(sel){ $(sel).scrollIntoView({behavior:'smooth',block:'start'}); }
+
+/* 시작 */
+loadAll();
+renderDbStatus();
+</script>
+</body>
+</html>
