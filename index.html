@@ -135,6 +135,10 @@ table.grid tr:last-child td{border-bottom:none}
 .dbrow:last-child{border-bottom:0}
 .switch{display:inline-flex;align-items:center;gap:9px;font-size:13.5px;font-weight:600;cursor:pointer;user-select:none}
 .switch input{width:18px;height:18px;accent-color:var(--ink)}
+.chk{display:inline-flex;align-items:center;gap:8px;font-size:13.5px;font-weight:600;cursor:pointer;border:1px solid var(--line-strong);background:#fff;border-radius:10px;padding:8px 13px;margin:0 8px 8px 0;transition:.15s}
+.chk:hover{border-color:var(--copper)}
+.chk input{width:17px;height:17px;accent-color:var(--ink)}
+.chk.on{border-color:var(--ink);background:var(--ink);color:#fff}
 details.paste>summary{font-size:12.5px;color:var(--copper);cursor:pointer;font-weight:700;list-style:none}
 details.paste>summary::-webkit-details-marker{display:none}
 details.paste>summary::before{content:"▸ ";color:var(--copper)}
@@ -207,11 +211,26 @@ details.paste[open]>summary::before{content:"▾ "}
 
   <!-- ================= STEP 3 ================= -->
   <div class="card hide" id="card-classify">
-    <h2><span class="num">3</span>판정 신청 (판정정보 없는 모델)</h2>
-    <p class="sub">판정 이력이 없는 모델은 판정이 필요합니다. 모델(품목)별로 아래 항목을 입력하세요. 무게는 필수입니다.</p>
-    <div class="note warn"><span class="ic">📎</span><span>각 모델의 <b>모델명이 포함된 사양서</b>를 반드시 함께 첨부하여 제출하세요.</span></div>
-    <div id="classify-body" style="margin-top:14px"></div>
-    <div class="toolbar" style="margin-bottom:0"><button class="btn primary" id="btn-classify-next">다음 (위험 점검)</button></div>
+    <h2><span class="num">3</span>판정 신청 (신규 판정 — 품의 작성)</h2>
+    <p class="sub">판정 이력이 없는 모델은 판정 신청 품의가 필요합니다. 거래자·품목 정보를 입력하면 상신용 제목·본문을 생성합니다.</p>
+    <div class="note info"><span class="ic">i</span><span><b>안내</b>
+      <ul style="margin:6px 0 0;padding-left:18px">
+        <li>신청 품의 상신 시 아래 제목과 본문을 복사하여 사용하시기 바랍니다.</li>
+        <li>품의에는 신청 품목별 사양서 첨부가 필요합니다.</li>
+        <li>통상그룹(송진혁/강부현 프로) 합의 — 파트장 이상 결재로 진행해 주시기 바랍니다.</li>
+      </ul></span></div>
+
+    <div class="divider"></div>
+    <h3 class="serif" style="font-size:15px;margin-bottom:10px">1. 거래자 정보</h3>
+    <div id="trader-body"></div>
+
+    <div class="divider"></div>
+    <h3 class="serif" style="font-size:15px;margin-bottom:10px">2. 품목 정보</h3>
+    <div id="classify-body"></div>
+
+    <div class="toolbar" style="margin-top:16px"><button class="btn primary" id="btn-classify-gen">판정 신청 품의 생성</button></div>
+    <div id="classify-doc-out"></div>
+    <div class="toolbar" id="classify-next" style="margin-bottom:0"></div>
   </div>
 
   <!-- ================= STEP 4 ================= -->
@@ -337,7 +356,7 @@ const FORMS = { reclassification:'', classification:'', prenotification:'' };
 const dbLoaded = { self:false, expert:false, keywordHs:false, sanctions:false, prenotif:false };
 
 const state = {
-  models:[], lookups:[], classify:{},
+  models:[], lookups:[], classify:{}, classifyDoc:null, screened:false,
   enduser:{ name:'', country:'', business:'', sameForAll:true, perModel:{} },
   indicators:[], sanctionsHits:[], prenotifModels:[],
   prenotif:{ buyer:'',consignee:'',enduser:'', rows:[] },
@@ -486,6 +505,14 @@ $('#btn-lookup').addEventListener('click', ()=>{
   if(!models.length){ alert('모델명을 1개 이상 입력하세요.'); return; }
   state.models = models;
   state.lookups = models.map(lookupModel);
+  // 이전 진행상태 초기화
+  state.classify={}; state.classifyDoc=null; state.screened=false;
+  state.sanctionsHits=[]; state.prenotifModels=[];
+  state.enduser={ name:'', country:'', business:'', sameForAll:true, perModel:{} };
+  state.prenotif={ buyer:'',consignee:'',enduser:'', rows:[] };
+  ['#card-classify','#card-screen','#card-prenotif','#card-summary'].forEach(s=>$(s).classList.add('hide'));
+  const doc=$('#classify-doc-out'); if(doc) doc.innerHTML='';
+  const cn=$('#classify-next'); if(cn) cn.innerHTML='';
   renderResults();
   show('#card-results'); scrollTo_('#card-results');
 });
@@ -561,18 +588,11 @@ function renderResults(){
   }
   bindCopy(body);
 }
-// 상황허가/사전신고 점검 대상: 판정신청(미판정) 모델 + 유효한 '해당' 모델
+// 위험 점검/사전신고 대상: 유효한 '해당' 모델만. (신규 판정건은 STEP 3 품의로 별도 처리)
 function controlItems(){
-  const out=[];
-  state.lookups.forEach(L=>{
-    if(L.found){
-      if(!L.expired && L.isHae) out.push({model:L.model, hs:L.hs, number:L.number, item:L.item, source:'found', noHsMatch:false});
-    } else {
-      const o=state.classify[L.model];
-      if(o) out.push({model:L.model, hs:o.hs, number:'', item:o.item, source:'need', noHsMatch:o.noHsMatch});
-    }
-  });
-  return out;
+  return state.lookups
+    .filter(L=>L.found && !L.expired && L.isHae)
+    .map(L=>({model:L.model, hs:L.hs, number:L.number, item:L.item, source:'found', noHsMatch:false}));
 }
 function kvBlock(L){
   return `<dl class="kv" style="margin-bottom:12px">
@@ -591,15 +611,16 @@ function kvBlock(L){
    STEP 3 : 판정 신청 입력 (모델별)
    ===================================================================== */
 function buildClassify(){
+  buildTrader();
   const body=$('#classify-body'); body.innerHTML='';
-  state.lookups.filter(L=>!L.found).forEach(L=>{
+  state.lookups.filter(L=>!L.found).forEach((L,idx)=>{
     const id=cssId(L.model);
     state.classify[L.model] = state.classify[L.model] || {};
     const c=document.createElement('div'); c.className='mcard';
     c.innerHTML = `
-      <div class="head"><span class="mname">${esc(L.model)}</span>${badge('info','신규 판정')}</div>
+      <div class="head"><span class="mname">${idx+1}번 품목 · ${esc(L.model)}</span>${badge('info','신규 판정')}</div>
       <div class="body">
-        <div><label class="fld req">물품명</label>
+        <div><label class="fld req">물품명(제품명)</label>
           <input type="text" id="cl-item-${id}" placeholder="예: 스마트폰, 태블릿 등">
           <div class="hint">물품명을 입력하면 아래에 추천 HS코드가 표시됩니다.</div>
           <div class="chips" id="cl-recwrap-${id}"></div>
@@ -608,12 +629,8 @@ function buildClassify(){
           <input type="text" id="cl-hs-${id}" placeholder="추천 HS 클릭 또는 직접 입력">
           <div id="cl-hsnote-${id}" style="margin-top:8px"></div>
         </div>
-        <div class="row" style="margin-top:12px">
-          <div class="col" style="flex:0 0 220px"><label class="fld req">무게(대략)</label><input type="text" id="cl-w-${id}" placeholder="예: 약 2.5kg"></div>
-          <div class="col"><label class="fld">사양 및 규격 (자유 기재)</label><input type="text" id="cl-spec-${id}" placeholder="무게 외 사양·규격"></div>
-        </div>
+        <div style="margin-top:12px"><label class="fld req">사양 및 규격</label><input type="text" id="cl-spec-${id}" placeholder="예: 256GB / 12GB, 약 2.5kg"></div>
         <div style="margin-top:12px"><label class="fld req">용도</label><input type="text" id="cl-purpose-${id}"></div>
-        <div style="margin-top:14px"><label class="switch"><input type="checkbox" id="cl-specok-${id}"> 모델명이 포함된 사양서를 함께 첨부하겠습니다</label></div>
       </div>`;
     body.appendChild(c);
   });
@@ -622,6 +639,35 @@ function buildClassify(){
     inp.addEventListener('input', ()=>{ recommendHS(id); markHsNote(id); });
   });
   $$('input[id^="cl-hs-"]', body).forEach(inp=>inp.addEventListener('input', ()=>markHsNote(inp.id.replace('cl-hs-',''))));
+}
+// 거래자 정보(수입국/수입자) 입력 UI
+function buildTrader(){
+  const t=$('#trader-body');
+  t.innerHTML=`
+    <label class="fld req">수입국 (복수 선택 가능)</label>
+    <div>
+      <label class="chk"><input type="checkbox" class="ctry" value="러시아"> 러시아</label>
+      <label class="chk"><input type="checkbox" class="ctry" value="벨라루스"> 벨라루스</label>
+    </div>
+    <label class="fld req" style="margin-top:14px">수입자 (복수 선택/입력 가능)</label>
+    <div id="imp-russia" class="hide" style="margin-bottom:8px">
+      <label class="chk"><input type="checkbox" class="imp" value="SERC"> SERC</label>
+      <label class="chk"><input type="checkbox" class="imp" value="SRR"> SRR</label>
+      <div class="hint">SERC / SRR 는 러시아 선택 시 선택할 수 있습니다.</div>
+    </div>
+    <input type="text" id="imp-etc" placeholder="기타 수입자 (여러 곳이면 쉼표로 구분)">`;
+  $$('#trader-body .chk input').forEach(cb=>cb.addEventListener('change',()=>cb.closest('.chk').classList.toggle('on',cb.checked)));
+  $$('#trader-body .ctry').forEach(cb=>cb.addEventListener('change',()=>{
+    const russia=[...$$('#trader-body .ctry')].some(x=>x.value==='러시아'&&x.checked);
+    $('#imp-russia').classList.toggle('hide', !russia);
+  }));
+}
+function selectedCountries(){ return [...$$('#trader-body .ctry')].filter(c=>c.checked).map(c=>c.value); }
+function selectedImporters(){
+  const arr=[];
+  if(selectedCountries().includes('러시아')) [...$$('#trader-body .imp')].filter(c=>c.checked).forEach(c=>arr.push(c.value));
+  const etc=(($('#imp-etc')&&$('#imp-etc').value)||'').split(/[,\n]/).map(s=>s.trim()).filter(Boolean);
+  return [...arr, ...etc];
 }
 // 물품명에 매칭되는 키워드-HS 행
 function recMatches(item){
@@ -664,21 +710,60 @@ function markHsNote(id){
   else { el.innerHTML=badge('info','추천 결과 없음 (위험 점검 대상)'); }
 }
 
-$('#btn-classify-next').addEventListener('click', ()=>{
+$('#btn-classify-gen').addEventListener('click', ()=>{
+  const countries = selectedCountries();
+  const importers = selectedImporters();
+  if(!countries.length){ alert('수입국을 1개 이상 선택하세요.'); return; }
+  if(!importers.length){ alert('수입자를 1개 이상 선택하거나 입력하세요.'); return; }
+
+  const items=[];
   for(const L of state.lookups.filter(x=>!x.found)){
     const id=cssId(L.model);
-    const o={
+    const o={ model:L.model,
       item: $('#cl-item-'+id).value.trim(), hs: $('#cl-hs-'+id).value.trim(),
-      weight: $('#cl-w-'+id).value.trim(), spec: $('#cl-spec-'+id).value.trim(),
-      purpose: $('#cl-purpose-'+id).value.trim(), specOk: $('#cl-specok-'+id).checked,
-      recHs: recListFor(id),
-    };
-    if(!o.item||!o.hs||!o.weight||!o.purpose){ alert(`[${L.model}] 물품명, HS코드, 무게, 용도는 필수입니다.`); return; }
+      spec: $('#cl-spec-'+id).value.trim(), purpose: $('#cl-purpose-'+id).value.trim(),
+      recHs: recListFor(id) };
+    if(!o.item||!o.hs||!o.spec||!o.purpose){ alert(`[${L.model}] 물품명, HS코드, 사양 및 규격, 용도는 필수입니다.`); return; }
     o.usedRec = o.recHs.length ? o.recHs.some(r=>hsMatch(r,o.hs)) : null;
     o.noHsMatch = (o.recHs.length===0);
-    state.classify[L.model]=o;
+    state.classify[L.model]=o; items.push(o);
   }
-  buildScreen(); show('#card-screen'); scrollTo_('#card-screen');
+
+  const n=items.length;
+  const title = `상황허가 대상품목 확인을 위한 판정 신청 (${items[0].model}${n>1?` 등 ${n}건`:''})`;
+  const itemLines = items.map((it,i)=>`${i+1}번 품목 ${it.hs} | ${it.item} | ${it.model} | ${it.spec} | ${it.purpose}`).join('\n');
+  const attachLines = items.map((it,i)=>`첨부 ${i+1}. ${i+1}번 품목 ${it.model} 사양서 파일`).join('\n');
+  const body =
+`상황허가 대상품목(제재품목) 확인을 위한 신청품의를 다음과 같이 상신합니다.
+
+1. 거래자 정보
+ - 수입국: ${countries.join(', ')}
+ - 수입자: ${importers.join(', ')}
+
+2. 품목 정보
+${itemLines}
+
+${attachLines}`;
+
+  state.classifyDoc = { countries, importers, items, title, body };
+
+  $('#classify-doc-out').innerHTML =
+    `<div class="divider"></div>
+     <label class="fld">제목</label>${formBlock(title,'cl-title')}
+     <label class="fld" style="margin-top:6px">본문</label>${formBlock(body,'cl-body')}`;
+  bindCopy($('#classify-doc-out'));
+
+  // 다음 단계: 신규 판정건은 여기서 마무리(위험점검 자동 이동 없음). 유효 '해당' 모델이 있으면 별도 점검 버튼 제공.
+  const foundHae = state.lookups.filter(L=>L.found && !L.expired && L.isHae);
+  const nx=$('#classify-next'); nx.innerHTML='';
+  if(foundHae.length){
+    nx.innerHTML = `<button class="btn" id="btn-cl-screen">유효 '해당' 모델 위험 점검 (${foundHae.length})</button>
+                    <button class="btn primary" id="btn-cl-summary">결과 보고서로 이동</button>`;
+    $('#btn-cl-screen').addEventListener('click', ()=>{ buildScreen(); show('#card-screen'); scrollTo_('#card-screen'); });
+  } else {
+    nx.innerHTML = `<button class="btn primary" id="btn-cl-summary">결과 보고서로 이동</button>`;
+  }
+  $('#btn-cl-summary').addEventListener('click', ()=>{ buildSummary(); show('#card-summary'); scrollTo_('#card-summary'); });
 });
 
 /* =====================================================================
@@ -742,6 +827,7 @@ $('#btn-screen-next').addEventListener('click', ()=>{
     });
   }
   state.indicators = INDICATORS.map((_,i)=>$('#ind-'+i).checked);
+  state.screened = true;
   buildPrenotif(); show('#card-prenotif'); scrollTo_('#card-prenotif');
 });
 
@@ -846,7 +932,8 @@ function reportHTML(){
   parts.push(`<h1>상황허가 판정 · 사전신고 점검 결과 보고서</h1>`);
   parts.push(`<p class="meta">작성일: <b>${today()}</b> · 본 결과는 담당자 제출용입니다.</p>`);
 
-  parts.push(`<h2>1. 모델별 판정정보 조회 결과</h2>`);
+  let sec=1;
+  parts.push(`<h2>${sec++}. 모델별 판정정보 조회 결과</h2>`);
   state.lookups.forEach(L=>{
     if(!L.found){ parts.push(`<div class="box"><h3>${esc(L.model)} — 판정정보 없음 (판정 필요)</h3></div>`); return; }
     parts.push(`<div class="box"><h3>${esc(L.model)} — ${L.expired?'만료됨 (재판정 필요)':(L.isHae?'유효 · 해당':'유효 · 비해당')}</h3>
@@ -862,29 +949,21 @@ function reportHTML(){
       </div>`);
   });
 
-  const nc=state.lookups.filter(L=>!L.found);
-  if(nc.length){
-    parts.push(`<h2>2. 판정 신청 내역</h2>`);
-    nc.forEach(L=>{
-      const o=state.classify[L.model]||{};
-      const recTxt = o.recHs&&o.recHs.length? o.recHs.join(', '):'(추천 결과 없음)';
-      const usedTxt = o.usedRec===null?'추천 결과 없음':(o.usedRec?'추천 HS 사용':'추천 HS 미사용 ⚠');
-      parts.push(`<div class="box"><h3>${esc(L.model)}</h3>
-        <table>
-        <tr><th>물품명</th><td>${esc(o.item)}</td><th>HS코드</th><td>${esc(o.hs)}</td></tr>
-        <tr><th>추천 HS</th><td>${esc(recTxt)}</td><th>추천 사용여부</th><td>${esc(usedTxt)}</td></tr>
-        <tr><th>무게</th><td>${esc(o.weight)}</td><th>용도</th><td>${esc(o.purpose)}</td></tr>
-        <tr><th>사양 및 규격</th><td colspan="3">${esc(o.spec||'-')}</td></tr>
-        <tr><th>사양서 첨부</th><td colspan="3">${o.specOk?'첨부 예정 (모델명 포함)':'⚠ 미확인'}</td></tr>
-        </table>
-        <h4>판정 신청서</h4><pre>${esc(fillForm(FORMS.classification||defaultClassifyForm(),{
-          'HS코드':o.hs,'추천HS':recTxt,'추천사용여부':usedTxt,'물품명':o.item,'모델명':L.model,
-          '사양및규격':o.spec,'무게':o.weight,'용도':o.purpose,
-          '사양서첨부':o.specOk?'예':'아니오','오늘':today()}))}</pre>
-        </div>`);
-    });
+  if(state.classifyDoc){
+    const d=state.classifyDoc;
+    parts.push(`<h2>${sec++}. 판정 신청 품의 (신규 판정)</h2>`);
+    parts.push(`<div class="box">
+      <table>
+      <tr><th>수입국</th><td>${esc(d.countries.join(', '))}</td></tr>
+      <tr><th>수입자</th><td>${esc(d.importers.join(', '))}</td></tr></table>
+      <h4>품의 제목</h4><pre>${esc(d.title)}</pre>
+      <h4>품의 본문</h4><pre>${esc(d.body)}</pre>
+      <p class="meta">※ 품의에는 신청 품목별 사양서 첨부 필요 · 통상그룹(송진혁/강부현 프로) 합의 — 파트장 이상 결재</p>
+      </div>`);
+  }
 
-    parts.push(`<h2>3. 위험 점검 (대러 제재 / 최종사용자 / 의심징후)</h2>`);
+  if(state.screened){
+    parts.push(`<h2>${sec++}. 위험 점검 (대러 제재 / 최종사용자 / 의심징후)</h2>`);
     if(state.sanctionsHits.length){
       parts.push(`<div class="box bad"><b>대러 제재대상 품목 가능성:</b><ul>${
         state.sanctionsHits.map(h=>`<li>${esc(h.model)} (HS ${esc(h.hs)}) — ${esc(h.desc)}</li>`).join('')}</ul></div>`);
@@ -902,7 +981,7 @@ function reportHTML(){
   }
 
   if(state.prenotifModels.length && state.prenotif.rows.length){
-    parts.push(`<h2>4. 사전신고</h2>
+    parts.push(`<h2>${sec++}. 사전신고</h2>
       <div class="box"><table>
       <tr><th>구매자</th><td>${esc(state.prenotif.buyer)}</td></tr>
       <tr><th>최종수하인</th><td>${esc(state.prenotif.consignee)}</td></tr>
@@ -917,7 +996,7 @@ function reportHTML(){
         '의심징후체크결과':INDICATORS.map((t,i)=>`#${i+1} [${state.indicators[i]?'해당':'비해당'}] ${t}`).join('\n'),
         '오늘':today()}))}</pre></div>`);
   } else if(state.prenotifModels.length){
-    parts.push(`<h2>4. 사전신고</h2><div class="box">사전신고 대상이나 신고서가 작성되지 않았습니다.</div>`);
+    parts.push(`<h2>${sec++}. 사전신고</h2><div class="box">사전신고 대상이나 신고서가 작성되지 않았습니다.</div>`);
   }
 
   const style=`<style>
