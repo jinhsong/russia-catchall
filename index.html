@@ -140,6 +140,12 @@ details.paste>summary::-webkit-details-marker{display:none}
 details.paste>summary::before{content:"▸ ";color:var(--copper)}
 details.paste[open]>summary::before{content:"▾ "}
 .footer{text-align:center;color:var(--muted);font-size:12px;margin-top:30px;line-height:1.6}
+/* 구석에 작게 두는 DB 상태 패널 */
+.db-panel{margin-top:34px}
+.db-panel>summary{list-style:none;cursor:pointer;color:var(--muted);font-size:11.5px;font-weight:600;text-align:center;padding:6px;opacity:.75;transition:.15s}
+.db-panel>summary::-webkit-details-marker{display:none}
+.db-panel>summary:hover{color:var(--copper);opacity:1}
+.db-panel[open]>summary{color:var(--ink-soft);opacity:1}
 
 @media(max-width:560px){
   .kv{grid-template-columns:1fr;gap:4px 0}
@@ -175,29 +181,6 @@ details.paste[open]>summary::before{content:"▾ "}
     <div class="eyebrow">상황허가 대상품목 자가점검</div>
     <h2 class="serif">모델 상황허가 판정·사전신고 확인</h2>
     <p>모델명을 입력하면 상황허가 대상품목 판정 정보를 확인하고, 만료·미판정·해당 여부에 따라 재판정·판정신청·사전신고 절차를 안내합니다. 마지막에 결과 보고서를 내려받아 담당자에게 제출하세요.</p>
-  </div>
-
-  <!-- ================= DB 상태 ================= -->
-  <div class="card" id="card-db">
-    <h2><span class="num">DB</span>판정 데이터 탑재 상태</h2>
-    <p class="sub">DB는 <code>data/</code> 폴더의 CSV 파일에서 읽어옵니다. GitHub Pages에 배포하면 자동으로 불러옵니다.</p>
-    <div id="db-status" style="margin-top:14px"></div>
-    <details class="paste" style="margin-top:14px">
-      <summary>DB를 불러오지 못했나요? 파일 직접 선택</summary>
-      <p class="hint" style="margin:8px 0">로컬에서 <code>file://</code>로 열면 보안정책상 자동 로드가 막힐 수 있습니다. 그럴 땐 아래에서 CSV 파일들을 직접 선택하세요.</p>
-      <div class="row">
-        <div class="col"><label class="fld">자가판정결과 (xlsx/csv)</label><input type="file" accept=".xlsx,.xls,.csv" data-load="self"></div>
-        <div class="col"><label class="fld">전문판정결과 (xlsx/csv)</label><input type="file" accept=".xlsx,.xls,.csv" data-load="expert"></div>
-      </div>
-      <div class="row" style="margin-top:8px">
-        <div class="col"><label class="fld">키워드-HS 매칭</label><input type="file" accept=".csv" data-load="keywordHs"></div>
-        <div class="col"><label class="fld">대러 제재대상(HS)</label><input type="file" accept=".csv" data-load="sanctions"></div>
-      </div>
-      <div class="row" style="margin-top:8px">
-        <div class="col"><label class="fld">사전신고 대상(HS)</label><input type="file" accept=".csv" data-load="prenotif"></div>
-        <div class="col"></div>
-      </div>
-    </details>
   </div>
 
   <!-- ================= STEP 1 ================= -->
@@ -278,6 +261,31 @@ details.paste[open]>summary::before{content:"▾ "}
       <span class="muted small" id="save-hint" style="align-self:center"></span>
     </div>
   </div>
+
+  <!-- ================= DB 상태 (구석에 작게) ================= -->
+  <details class="db-panel" id="card-db">
+    <summary>⚙ 판정 데이터 탑재 상태 · 파일 직접 선택</summary>
+    <div class="card" style="margin-top:10px">
+      <p class="sub">자가/전문 판정은 <code>data/self.xlsx</code>·<code>data/expert.xlsx</code>(제목행 2행), 그 외는 <code>data/</code> 의 CSV에서 읽어옵니다.</p>
+      <div id="db-status" style="margin-top:14px"></div>
+      <details class="paste" style="margin-top:14px">
+        <summary>DB를 불러오지 못했나요? 파일 직접 선택</summary>
+        <p class="hint" style="margin:8px 0">로컬에서 <code>file://</code>로 열면 보안정책상 자동 로드가 막힐 수 있습니다. 그럴 땐 아래에서 파일을 직접 선택하세요.</p>
+        <div class="row">
+          <div class="col"><label class="fld">자가판정결과 (xlsx/csv)</label><input type="file" accept=".xlsx,.xls,.csv" data-load="self"></div>
+          <div class="col"><label class="fld">전문판정결과 (xlsx/csv)</label><input type="file" accept=".xlsx,.xls,.csv" data-load="expert"></div>
+        </div>
+        <div class="row" style="margin-top:8px">
+          <div class="col"><label class="fld">키워드-HS 매칭</label><input type="file" accept=".csv" data-load="keywordHs"></div>
+          <div class="col"><label class="fld">대러 제재대상(HS)</label><input type="file" accept=".csv" data-load="sanctions"></div>
+        </div>
+        <div class="row" style="margin-top:8px">
+          <div class="col"><label class="fld">사전신고 대상(HS)</label><input type="file" accept=".csv" data-load="prenotif"></div>
+          <div class="col"></div>
+        </div>
+      </details>
+    </div>
+  </details>
 
   <div class="footer">사내 상황허가 판정·사전신고 점검 보조 도구 · 최종 책임은 수출 담당 부서의 검토에 따릅니다.</div>
 </div>
