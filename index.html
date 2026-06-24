@@ -1022,7 +1022,7 @@ $('#btn-exc-summary').addEventListener('click',()=>{ buildSummary(); show('#card
 /* =====================================================================
    STEP 5 : 사전신고 (인보이스 기반)
    ===================================================================== */
-function emptyInvoice(){ return { no:'', endUser:'', endUse:'', items:[] }; }
+function emptyInvoice(){ return { no:'', country:'', euChoice:'', euEtc:'', endUse:'', items:[] }; }
 function emptyItem(model){ return { model:model||'', candIdx:0, item:'', number:'', qty:'', price:'', paid:'유상' }; }
 
 // 모델명으로 판정 DB 후보(판정번호 있는 행) 조회
@@ -1060,8 +1060,21 @@ function invoiceCardHtml(inv,iv){
     <div class="body">
       <div class="row">
         <div class="col"><label class="fld req">인보이스 번호</label><input id="pn-${iv}-no" value="${esc(inv.no)}"></div>
-        <div class="col"><label class="fld req">최종사용자</label><input id="pn-${iv}-eu" value="${esc(inv.endUser)}"></div>
         <div class="col"><label class="fld">최종사용용도</label><input id="pn-${iv}-use" value="${esc(inv.endUse)}"></div>
+      </div>
+      <div style="margin-top:12px"><label class="fld req">목적국 (택1)</label>
+        <div id="pn-${iv}-ctry">
+          <label class="chk"><input type="radio" name="pn-${iv}-ctry" value="러시아" ${inv.country==='러시아'?'checked':''}> 러시아</label>
+          <label class="chk"><input type="radio" name="pn-${iv}-ctry" value="벨라루스" ${inv.country==='벨라루스'?'checked':''}> 벨라루스</label>
+        </div>
+      </div>
+      <div style="margin-top:12px"><label class="fld req">최종사용자 (택1)</label>
+        <div id="pn-${iv}-euwrap">
+          <label class="chk"><input type="radio" name="pn-${iv}-eu" value="SERC" ${inv.euChoice==='SERC'?'checked':''}> SERC</label>
+          <label class="chk"><input type="radio" name="pn-${iv}-eu" value="SRR" ${inv.euChoice==='SRR'?'checked':''}> SRR</label>
+          <label class="chk"><input type="radio" name="pn-${iv}-eu" value="기타" ${inv.euChoice==='기타'?'checked':''}> 기타</label>
+        </div>
+        <input id="pn-${iv}-euetc" class="hide" value="${esc(inv.euEtc||'')}" placeholder="기타 최종사용자 입력" style="margin-top:8px">
       </div>
       <h4 class="serif" style="font-size:14px;margin:14px 0 6px">품목 (${inv.items.length})</h4>
       ${inv.items.map((it,k)=>itemRowHtml(iv,k,it)).join('') || '<p class="hint">품목이 없습니다. 아래 버튼으로 추가하세요.</p>'}
@@ -1127,13 +1140,33 @@ function bindInvoiceEvents(host){
   $$('button[data-delinv]',host).forEach(b=>b.addEventListener('click',()=>{
     const iv=+b.dataset.delinv; syncInvoices(); state.preInvoices.splice(iv,1); renderInvoices();
   }));
+  // 인보이스 헤더: 목적국 / 최종사용자 단일 선택 + 러시아 게이팅
+  state.preInvoices.forEach((inv,iv)=>{
+    const ctry=$(`#pn-${iv}-ctry`,host), euw=$(`#pn-${iv}-euwrap`,host), etc=$(`#pn-${iv}-euetc`,host);
+    const refreshOn=w=>{ if(w) $$('.chk',w).forEach(l=>l.classList.toggle('on', l.querySelector('input').checked)); };
+    const applyEu=()=>{
+      const russia = ctry && ctry.querySelector('input:checked') && ctry.querySelector('input:checked').value==='러시아';
+      if(euw) ['SERC','SRR'].forEach(v=>{ const r=euw.querySelector(`input[value="${v}"]`); if(r){ r.disabled=!russia;
+        const lab=r.closest('.chk'); lab.style.opacity=russia?'':'.45'; lab.style.cursor=russia?'pointer':'not-allowed';
+        if(!russia && r.checked){ r.checked=false; } } });
+      const sel = euw && euw.querySelector('input:checked');
+      if(etc) etc.classList.toggle('hide', !(sel && sel.value==='기타'));
+      refreshOn(euw);
+    };
+    if(ctry) $$('input',ctry).forEach(r=>r.addEventListener('change',()=>{ refreshOn(ctry); applyEu(); }));
+    if(euw) $$('input',euw).forEach(r=>r.addEventListener('change',()=>{ if(etc) etc.classList.toggle('hide', r.value!=='기타'); refreshOn(euw); }));
+    refreshOn(ctry); applyEu();
+  });
 }
+function invoiceEndUser(inv){ return inv.euChoice==='기타' ? (inv.euEtc||'') : (inv.euChoice||''); }
 function syncInvoices(){
   state.preInvoices.forEach((inv,iv)=>{
     const g=id=>$('#'+id);
     if(g(`pn-${iv}-no`)) inv.no=g(`pn-${iv}-no`).value.trim();
-    if(g(`pn-${iv}-eu`)) inv.endUser=g(`pn-${iv}-eu`).value.trim();
     if(g(`pn-${iv}-use`)) inv.endUse=g(`pn-${iv}-use`).value.trim();
+    const cc=g(`pn-${iv}-ctry`); if(cc){ const r=cc.querySelector('input:checked'); inv.country=r?r.value:''; }
+    const ee=g(`pn-${iv}-euwrap`); if(ee){ const r=ee.querySelector('input:checked'); inv.euChoice=r?r.value:''; }
+    const et=g(`pn-${iv}-euetc`); if(et) inv.euEtc=et.value.trim();
     inv.items.forEach((it,k)=>{
       const ms=g(`pn-${iv}-${k}-model`); if(ms) it.model=ms.value;
       const cs=g(`pn-${iv}-${k}-cand`); if(cs) it.candIdx=+cs.value||0;
@@ -1155,7 +1188,9 @@ $('#btn-prenotif-save').addEventListener('click',()=>{
   const errs=[];
   state.preInvoices.forEach((inv,iv)=>{
     if(!inv.no){ fieldErr($(`#pn-${iv}-no`),'인보이스 번호 입력'); errs.push(`인보이스 #${iv+1} 번호`); }
-    if(!inv.endUser){ fieldErr($(`#pn-${iv}-eu`),'최종사용자 입력'); errs.push(`인보이스 #${iv+1} 최종사용자`); }
+    if(!inv.country){ errs.push(`인보이스 #${iv+1} 목적국을 선택하세요.`); }
+    if(!inv.euChoice){ errs.push(`인보이스 #${iv+1} 최종사용자를 선택하세요.`); }
+    else if(inv.euChoice==='기타' && !inv.euEtc){ fieldErr($(`#pn-${iv}-euetc`),'기타 최종사용자 입력'); errs.push(`인보이스 #${iv+1} 기타 최종사용자`); }
     if(!inv.items.length){ errs.push(`인보이스 #${iv+1}에 품목이 없습니다.`); }
     inv.items.forEach((it,k)=>{
       if(!it.qty){ fieldErr($(`#pn-${iv}-${k}-qty`),'수량 입력'); errs.push(`인보이스 #${iv+1} 품목 ${k+1} 수량`); }
@@ -1278,8 +1313,8 @@ function reportHTML(){
       }).join('');
       parts.push(`<div class="box">
         <table>
-        <tr><th>인보이스 번호</th><td>${esc(inv.no)}</td><th>최종사용자</th><td>${esc(inv.endUser)}</td></tr>
-        <tr><th>최종사용용도</th><td colspan="3">${esc(inv.endUse||'-')}</td></tr></table>
+        <tr><th>인보이스 번호</th><td>${esc(inv.no)}</td><th>목적국</th><td>${esc(inv.country||'-')}</td></tr>
+        <tr><th>최종사용자</th><td>${esc(invoiceEndUser(inv)||'-')}</td><th>최종사용용도</th><td>${esc(inv.endUse||'-')}</td></tr></table>
         <h4>품목 (${inv.items.length})</h4>
         <table class="cards"><tr><th>제품명</th><th>모델명</th><th>판정발급번호</th><th>수량(EA)</th><th>단가(USD)</th><th>총액(USD)</th><th>유무상</th></tr>
         ${rows}
