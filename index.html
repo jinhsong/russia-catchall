@@ -453,17 +453,19 @@ function badge(type, text){ return `<span class="badge ${type}"><span class="pip
 function note(type, ic, html){ return `<div class="note ${type}"><span class="ic">${ic}</span><span>${html}</span></div>`; }
 const fmtUSD = n => (Number(n)||0).toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2});
 
-/* 진행 스테퍼 */
+/* 진행 스테퍼 — 한 번에 한 단계만 표시 */
+const STEP_CARDS=['#card-input','#card-results','#card-classify','#card-exception','#card-prenotif','#card-screen','#card-summary'];
+const reached=new Set(['#card-input']);
 function setStep(sel){
   $$('#stepper button').forEach(b=>{
-    const c=b.dataset.card; const vis = $(c) && !$(c).classList.contains('hide');
+    const c=b.dataset.card;
     b.classList.toggle('active', c===sel);
-    b.classList.toggle('done', vis && c!==sel);
-    b.disabled = !vis && c!==sel;
+    b.classList.toggle('done', reached.has(c) && c!==sel);
+    b.disabled = !reached.has(c);
   });
 }
 $$('#stepper button').forEach(b=>b.addEventListener('click',()=>{
-  const c=b.dataset.card; if($(c) && !$(c).classList.contains('hide')){ setStep(c); scrollTo_(c); }
+  const c=b.dataset.card; if(reached.has(c)){ show(c); scrollTo_(c); }
 }));
 
 /* DB 미탑재 경고 배너 */
@@ -591,8 +593,8 @@ function renderModelPreview(){
 $('#models').addEventListener('input', renderModelPreview);
 $('#btn-reset').addEventListener('click', ()=>{
   $('#models').value=''; renderModelPreview();
-  ['#card-results','#card-classify','#card-screen','#card-prenotif','#card-summary'].forEach(s=>$(s).classList.add('hide'));
-  $('#card-input').scrollIntoView({behavior:'smooth',block:'start'});
+  reached.clear(); reached.add('#card-input');
+  show('#card-input'); scrollTo_('#card-input');
 });
 function doLookup(){
   const models = parseModelInput($('#models').value);
@@ -606,7 +608,7 @@ function doLookup(){
   state.sanctionsHits=[]; state.prenotifModels=[];
   state.enduser={ name:'', country:'', business:'', sameForAll:true, perModel:{} };
   state.preInvoices=[]; state.preDone=false;
-  ['#card-classify','#card-screen','#card-prenotif','#card-summary'].forEach(s=>$(s).classList.add('hide'));
+  reached.clear(); reached.add('#card-input');
   const doc=$('#classify-doc-out'); if(doc) doc.innerHTML='';
   const cn=$('#classify-next'); if(cn) cn.innerHTML='';
   renderResults();
@@ -1403,7 +1405,10 @@ function defaultPrenotifForm(){ return `[사전신고서]
    공통 헬퍼
    ===================================================================== */
 function cssId(s){ return String(s).replace(/[^\w가-힣-]/g,'_'); }
-function show(sel){ $(sel).classList.remove('hide'); setStep(sel); }
+function show(sel){
+  STEP_CARDS.forEach(c=>{ const el=$(c); if(el) el.classList.toggle('hide', c!==sel); });
+  reached.add(sel); setStep(sel);
+}
 function scrollTo_(sel){ $(sel).scrollIntoView({behavior:'smooth',block:'start'}); }
 
 /* =====================================================================
