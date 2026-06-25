@@ -1,1 +1,1 @@
-rebuild: label update
+rebuild: trigger importer label workflow
