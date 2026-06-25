@@ -322,12 +322,13 @@ details.paste[open]>summary::before{content:"▾ "}
         </div>
         <div class="row" style="margin-top:8px">
           <div class="col"><label class="fld">사전신고 대상(HS)</label><input type="file" accept=".csv" data-load="prenotif"></div>
-          <div class="col"></div>
+          <div class="col"><label class="fld">HS코드 DB(10자리)</label><input type="file" accept=".csv" data-load="hsList"></div>
         </div>
       </details>
     </div>
   </details>
 
+  <datalist id="hs-list"></datalist>
   <div class="footer">사내 상황허가 판정·사전신고 점검 보조 도구 · 최종 책임은 수출 담당 부서의 검토에 따릅니다.</div>
 </div>
 
@@ -344,6 +345,7 @@ const DATA_FILES = {
   keywordHs: { csv:'data/keyword_hs.csv' },
   sanctions: { csv:'data/russia_sanctions_hs.csv' },
   prenotif:  { csv:'data/prenotification_hs.csv' },
+  hsList:    { csv:'data/hs_codes.csv' },
 };
 const FORM_FILES = {
   reclassification: 'forms/reclassification.txt',
@@ -352,7 +354,7 @@ const FORM_FILES = {
 };
 const DB_LABELS = {
   self:'자가판정결과', expert:'전문판정결과', keywordHs:'키워드-HS 매칭',
-  sanctions:'대러 제재대상 품목(HS)', prenotif:'사전신고 대상(HS)'
+  sanctions:'대러 제재대상 품목(HS)', prenotif:'사전신고 대상(HS)', hsList:'HS코드 DB(10자리)'
 };
 
 const INDICATORS = [
@@ -373,9 +375,9 @@ const INDICATORS = [
 /* =====================================================================
    전역 상태
    ===================================================================== */
-const DB = { self:[], expert:[], keywordHs:[], sanctions:[], prenotif:[] };
+const DB = { self:[], expert:[], keywordHs:[], sanctions:[], prenotif:[], hsList:[] };
 const FORMS = { reclassification:'', classification:'', prenotification:'' };
-const dbLoaded = { self:false, expert:false, keywordHs:false, sanctions:false, prenotif:false };
+const dbLoaded = { self:false, expert:false, keywordHs:false, sanctions:false, prenotif:false, hsList:false };
 
 const state = {
   models:[], lookups:[], classify:{}, classifyDoc:null, screened:false,
@@ -448,6 +450,19 @@ function hsMatch(a,b){ a=normHS(a); b=normHS(b);
   if(a.length<4||b.length<4) return false; return a.startsWith(b)||b.startsWith(a); }
 const isHaeResult = res => /해당/.test(res) && !/비해당/.test(res);
 
+// HS 10자리 DB 검증 (DB 미탑재 시 true — 허용+경고 정책)
+let HS_SET=null;
+function isValidHs(hs){
+  if(!DB.hsList || !DB.hsList.length) return true;
+  if(!HS_SET) HS_SET = new Set(DB.hsList.map(r=>normHS(F.hs(r))).filter(x=>x.length===10));
+  return HS_SET.has(normHS(hs));
+}
+function refreshHsDatalist(){
+  const dl=document.getElementById('hs-list'); if(!dl) return;
+  const rows=(DB.hsList||[]).slice(0,2000);
+  dl.innerHTML = rows.map(r=>{ const h=normHS(F.hs(r)); return h.length===10? `<option value="${h}">${esc(F.item(r)||'')}</option>`:''; }).join('');
+}
+
 /* markup helpers */
 function badge(type, text){ return `<span class="badge ${type}"><span class="pip"></span>${esc(text)}</span>`; }
 function note(type, ic, html){ return `<div class="note ${type}"><span class="ic">${ic}</span><span>${html}</span></div>`; }
@@ -517,7 +532,7 @@ function associateLabels(root){
 /* =====================================================================
    DB / 양식 로드
    ===================================================================== */
-function ingestRows(key, rows){ DB[key]=rows||[]; dbLoaded[key]=true; renderDbStatus(); }
+function ingestRows(key, rows){ DB[key]=rows||[]; dbLoaded[key]=true; if(key==='hsList'){ HS_SET=null; refreshHsDatalist(); } renderDbStatus(); }
 
 // xlsx → 객체 배열. headerRow는 제목행 위치(1-based; 상황판정 파일은 2).
 function parseXlsx(buf, headerRow){
@@ -744,7 +759,7 @@ function buildClassify(){
           <div class="chips" id="cl-recwrap-${id}"></div>
         </div>
         <div style="margin-top:12px"><label class="fld req">HS코드 (숫자 10자리)</label>
-          <input type="text" id="cl-hs-${id}" inputmode="numeric" maxlength="10" placeholder="예: 8517130000 (점·하이픈 자동 제거)">
+          <input type="text" id="cl-hs-${id}" list="hs-list" inputmode="numeric" maxlength="10" placeholder="예: 8517130000 (DB의 10자리 HS만 허용)">
           <div id="cl-hsnote-${id}" style="margin-top:8px"></div>
         </div>
         <div class="row" style="margin-top:12px">
@@ -829,9 +844,16 @@ function markHsNote(id){
   const recs=recListFor(id);
   const el=$('#cl-hsnote-'+id);
   if(!hs){ el.innerHTML=''; return; }
-  if(recs.length && recs.some(r=>hsMatch(r,hs))){ el.innerHTML=badge('ok','추천 HS 사용'); }
-  else if(recs.length){ el.innerHTML=badge('warn','추천 HS 미사용 — 보고서에 표시됩니다'); }
-  else { el.innerHTML=badge('info','추천 결과 없음 — 직접 입력'); }
+  const usedRec = recs.length && recs.some(r=>hsMatch(r,hs));
+  let out='';
+  if(hs.length!==10){ out=badge('warn','HS는 숫자 10자리'); }
+  else if(DB.hsList.length && !isValidHs(hs)){ out=badge('danger','DB에 없는 HS코드 (입력 불가)'); }
+  else {
+    out = DB.hsList.length ? badge('ok','유효 HS') : badge('ok','HS 입력됨');
+    if(usedRec) out += ' '+badge('ok','추천 HS');
+    else if(recs.length) out += ' '+badge('neutral','추천 외 → 비고 표시');
+  }
+  el.innerHTML=out;
 }
 
 $('#btn-classify-gen').addEventListener('click', ()=>{
@@ -856,6 +878,7 @@ $('#btn-classify-gen').addEventListener('click', ()=>{
       recHs: recListFor(id) };
     if(o.item.length<2){ fieldErr($('#cl-item-'+id),'제품명은 2글자 이상'); errs.push(`[${L.model}] 제품명은 2글자 이상`); }
     if(o.hs.length!==10){ fieldErr(hsEl,`HS코드는 숫자 10자리 (현재 ${o.hs.length}자리)`); errs.push(`[${L.model}] HS코드 숫자 10자리`); }
+    else if(DB.hsList.length && !isValidHs(o.hs)){ fieldErr(hsEl,'DB에 없는 HS코드입니다 (10자리 DB 기준)'); errs.push(`[${L.model}] DB에 없는 HS코드`); }
     if(!o.spec){ fieldErr($('#cl-spec-'+id),'사양 및 규격 입력'); errs.push(`[${L.model}] 사양 및 규격`); }
     if(!o.weight){ fieldErr($('#cl-weight-'+id),'무게 입력'); errs.push(`[${L.model}] 무게`); }
     if(!o.purpose){ fieldErr($('#cl-purpose-'+id),'용도 입력'); errs.push(`[${L.model}] 용도`); }
@@ -871,27 +894,40 @@ $('#btn-classify-gen').addEventListener('click', ()=>{
 
   const n=items.length;
   const title = `상황허가 대상품목 확인을 위한 판정 신청 (${items[0].model}${n>1?` 등 ${n}건`:''})`;
-  // 품목 정보 표 (탭 구분 — Office/HWP 등에 붙여넣으면 표로 변환)
-  const tableHeader = `No.\tHS코드\tHS구분\t제품명\t모델명\t사양 및 규격\t용도`;
-  const tableRows = items.map((it,i)=>`${i+1}\t${it.hs}\t${it.hsSource}\t${it.item}\t${it.model}\t${it.specFull}\t${it.purpose}`);
-  const itemTable = [tableHeader, ...tableRows].join('\n');
-  const attachLines = items.map((it,i)=>`첨부 ${i+1}. ${i+1}번 품목 ${it.model} 사양서 파일`).join('\n');
-  const body =
-`상황허가 대상품목(제재품목) 확인을 위한 신청품의를 다음과 같이 상신합니다.
-
-1. 거래자 정보
- - 수입국: ${countries.join(', ')}
- - 수입자: ${importers.join(', ')}
-
-2. 품목 정보
-${itemTable}
-
-${attachLines}`;
-
-  state.classifyDoc = { countries, importers, items, title, body };
+  const d={ countries, importers, items, title };
+  d.body = bodyPlain(d);
+  state.classifyDoc = d;
   renderClassifyDoc();
   saveDraft();
 });
+
+// 품목 정보 표 데이터 (No./HS코드/제품명/모델명/사양 및 규격/용도/비고)
+function classifyTableData(d){
+  const headers=['No.','HS코드','제품명','모델명','사양 및 규격','용도','비고'];
+  const rows=d.items.map((it,i)=>[String(i+1), it.hs, it.item, it.model, it.specFull, it.purpose, it.hsSource==='직접입력'?'HS 직접입력':'']);
+  return {headers, rows};
+}
+function bodyPlain(d){
+  const {headers,rows}=classifyTableData(d);
+  const attach=d.items.map((it,i)=>`첨부 ${i+1}. ${i+1}번 품목 ${it.model} 사양서 파일`).join('\n');
+  return `상황허가 대상품목(제재품목) 확인을 위한 신청품의를 다음과 같이 상신합니다.
+
+1. 거래자 정보
+ - 수입국: ${d.countries.join(', ')}
+ - 수입자: ${d.importers.join(', ')}
+
+2. 품목 정보
+${plainTable(headers,rows)}
+
+${attach}`;
+}
+function bodyHtml(d){
+  const {headers,rows}=classifyTableData(d);
+  const attach=d.items.map((it,i)=>`첨부 ${i+1}. ${i+1}번 품목 ${esc(it.model)} 사양서 파일`).join('<br>');
+  return `상황허가 대상품목(제재품목) 확인을 위한 신청품의를 다음과 같이 상신합니다.<br><br>`
+    +`1. 거래자 정보<br>&nbsp;- 수입국: ${esc(d.countries.join(', '))}<br>&nbsp;- 수입자: ${esc(d.importers.join(', '))}<br><br>`
+    +`2. 품목 정보<br>${htmlTableRich(headers,rows)}<br>${attach}`;
+}
 
 // 품의 제목·본문 출력 (편집 가능 + 복사). state.classifyDoc 기반 — 복원 시에도 재사용.
 function renderClassifyDoc(){
@@ -904,21 +940,27 @@ function renderClassifyDoc(){
          <li>품의에는 <b>신청 품목별 사양서 첨부</b>가 필요합니다.</li>
          <li><b>통상그룹(송진혁/강부현 프로) 합의</b> 후 <b>파트장 이상 결재</b>로 진행해 주시기 바랍니다.</li>
        </ul></span></div>`;
+  const {headers,rows}=classifyTableData(d);
   $('#classify-doc-out').innerHTML =
     `<div class="divider"></div>${guide}
      <div class="toolbar"><button class="btn primary sm" id="btn-copy-all">제목+본문 전체 복사</button>
-       <span class="hint" style="align-self:center">아래에서 직접 수정 후 복사할 수 있습니다.</span></div>
+       <span class="hint" style="align-self:center">한글/워드/메일에 붙여넣으면 품목 정보가 표로 들어갑니다.</span></div>
      <label class="fld">제목</label>
      <input class="docedit" id="form-cl-title" value="${esc(d.title)}">
      <div class="toolbar" style="margin-top:6px"><button class="btn sm" data-copytext="cl-title">제목 복사</button></div>
      <label class="fld" style="margin-top:8px">본문</label>
-     <textarea class="docedit" id="form-cl-body" rows="14">${esc(d.body)}</textarea>
-     <div class="toolbar" style="margin-top:6px"><button class="btn sm" data-copytext="cl-body">본문 복사</button></div>`;
+     <textarea class="docedit" id="form-cl-body" rows="13">${esc(d.body)}</textarea>
+     <div class="toolbar" style="margin-top:6px"><button class="btn sm" id="btn-copy-body">본문 복사 (표 포함)</button></div>
+     <label class="fld" style="margin-top:8px">품목 정보 표 (미리보기)</label>
+     <div class="scrollx" style="padding:10px">${htmlTableRich(headers,rows)}</div>`;
   bindCopyText($('#classify-doc-out'));
   associateLabels($('#classify-doc-out'));
   $('#form-cl-title').addEventListener('input', e=>{ state.classifyDoc.title=e.target.value; });
   $('#form-cl-body').addEventListener('input', e=>{ state.classifyDoc.body=e.target.value; });
-  $('#btn-copy-all').addEventListener('click', e=>copyText($('#form-cl-title').value+'\n\n'+$('#form-cl-body').value, e.currentTarget));
+  $('#btn-copy-body').addEventListener('click', e=>copyRich($('#form-cl-body').value, bodyHtml(state.classifyDoc), e.currentTarget));
+  $('#btn-copy-all').addEventListener('click', e=>copyRich(
+     $('#form-cl-title').value+'\n\n'+$('#form-cl-body').value,
+     `<div>${esc($('#form-cl-title').value)}</div><br>${bodyHtml(state.classifyDoc)}`, e.currentTarget));
 
   const vf=state.lookups.filter(L=>L.found && !L.expired);
   const bihae=vf.filter(L=>!L.isHae), haePre=vf.filter(L=>L.isHae&&hsIsPrenotif(L.hs)), haeExc=vf.filter(L=>L.isHae&&!hsIsPrenotif(L.hs));
@@ -1233,6 +1275,35 @@ function fallbackCopy(text,done){
   ta.style.position='fixed'; ta.style.opacity='0'; document.body.appendChild(ta);
   ta.select(); try{document.execCommand('copy');}catch(e){} document.body.removeChild(ta); done&&done();
 }
+// 한글(2칸) 폭 고려 텍스트 표 + HTML 표 + 서식 복사
+function dispWidth(s){ let w=0; for(const ch of String(s==null?'':s)){ w += /[ᄀ-ᅟ⺀-꓏ꥠ-꥿가-힣豈-﫿︰-﹏＀-｠￠-￦]/.test(ch)?2:1; } return w; }
+function plainTable(headers, rows){
+  const all=[headers,...rows];
+  const widths=headers.map((_,i)=>Math.max(...all.map(r=>dispWidth(r[i]))));
+  const pad=(s,i)=>{ s=String(s==null?'':s); return s+' '.repeat(Math.max(0,widths[i]-dispWidth(s))); };
+  const sep='+'+widths.map(w=>'-'.repeat(w+2)).join('+')+'+';
+  const line=cells=>'| '+cells.map((c,i)=>pad(c,i)).join(' | ')+' |';
+  return [sep, line(headers), sep, ...rows.map(line), sep].join('\n');
+}
+function htmlTableRich(headers, rows){
+  const th=headers.map(h=>`<th style="border:1px solid #888;padding:4px 8px;background:#eee">${esc(h)}</th>`).join('');
+  const body=rows.map(r=>'<tr>'+r.map(c=>`<td style="border:1px solid #888;padding:4px 8px">${esc(c)}</td>`).join('')+'</tr>').join('');
+  return `<table style="border-collapse:collapse;border:1px solid #888"><thead><tr>${th}</tr></thead><tbody>${body}</tbody></table>`;
+}
+function copyRich(plain, html, btn){
+  const done=()=>{ if(btn){const t=btn.textContent; btn.textContent='복사됨 ✓'; setTimeout(()=>btn.textContent=t,1500);} };
+  if(navigator.clipboard && window.ClipboardItem){
+    try{
+      const item=new ClipboardItem({
+        'text/plain':new Blob([plain],{type:'text/plain'}),
+        'text/html': new Blob([html], {type:'text/html'})
+      });
+      navigator.clipboard.write([item]).then(done,()=>copyText(plain,btn));
+      return;
+    }catch(e){}
+  }
+  copyText(plain, btn);
+}
 
 /* =====================================================================
    STEP 6 : 결과 보고서
@@ -1276,8 +1347,8 @@ function reportHTML(){
       <tr><th>수입자</th><td>${esc(d.importers.join(', '))}</td></tr></table>
       <h4>품의 제목</h4><pre>${esc(d.title)}</pre>
       <h4>품목 정보</h4>
-      <table class="cards"><tr><th>No.</th><th>HS코드</th><th>HS구분</th><th>제품명</th><th>모델명</th><th>사양 및 규격</th><th>용도</th></tr>
-      ${d.items.map((it,i)=>`<tr><td data-label="No.">${i+1}</td><td data-label="HS코드">${esc(it.hs)}</td><td data-label="HS구분">${esc(it.hsSource||'')}</td><td data-label="제품명">${esc(it.item)}</td><td data-label="모델명">${esc(it.model)}</td><td data-label="사양 및 규격">${esc(it.specFull)}</td><td data-label="용도">${esc(it.purpose)}</td></tr>`).join('')}
+      <table class="cards"><tr><th>No.</th><th>HS코드</th><th>제품명</th><th>모델명</th><th>사양 및 규격</th><th>용도</th><th>비고</th></tr>
+      ${d.items.map((it,i)=>`<tr><td data-label="No.">${i+1}</td><td data-label="HS코드">${esc(it.hs)}</td><td data-label="제품명">${esc(it.item)}</td><td data-label="모델명">${esc(it.model)}</td><td data-label="사양 및 규격">${esc(it.specFull)}</td><td data-label="용도">${esc(it.purpose)}</td><td data-label="비고">${it.hsSource==='직접입력'?'HS 직접입력':''}</td></tr>`).join('')}
       </table>
       <h4>첨부</h4><ul style="margin:4px 0 0">${d.items.map((it,i)=>`<li>첨부 ${i+1}. ${i+1}번 품목 ${esc(it.model)} 사양서 파일</li>`).join('')}</ul>
       <h4>복사용 본문 (표 포함)</h4><pre>${esc(d.body)}</pre>
