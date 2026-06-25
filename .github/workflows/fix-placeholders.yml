@@ -1,0 +1,48 @@
+name: Fix classification placeholders
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - main
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Add examples to classification fields
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          p = Path('index.html')
+          s = p.read_text(encoding='utf-8')
+          replacements = {
+              '<label class="fld req">물품명(제품명)</label><input type="text" id="cl-item-${idx}" value="${esc(o.item||L.item||\'\')}">': '<label class="fld req">물품명(제품명)</label><input type="text" id="cl-item-${idx}" placeholder="예) 스마트폰, 태블릿 등" value="${esc(o.item||L.item||\'\')}">',
+              '<label class="fld req" style="margin-top:12px">HS코드</label><input type="text" id="cl-hs-${idx}" maxlength="10" inputmode="numeric" value="${esc(o.hs||L.hs||\'\')}" data-src="${esc(o.hsSource||\'직접입력\')}">': '<label class="fld req" style="margin-top:12px">HS코드(한국 수출기준)</label><input type="text" id="cl-hs-${idx}" maxlength="10" inputmode="numeric" placeholder="10자리 숫자만 입력 가능" value="${esc(o.hs||L.hs||\'\')}" data-src="${esc(o.hsSource||\'직접입력\')}">',
+              '<label class="fld req">사양 및 규격</label><input type="text" id="cl-spec-${idx}" value="${esc(o.spec||L.spec||\'\')}">': '<label class="fld req">사양 및 규격</label><input type="text" id="cl-spec-${idx}" placeholder="예) 화면 6.1형, 저장용량 256GB, RAM 8GB 등" value="${esc(o.spec||L.spec||\'\')}">',
+              '<label class="fld req">무게</label><input type="text" id="cl-weight-${idx}" value="${esc(o.weight||\'\')}">': '<label class="fld req">무게</label><input type="text" id="cl-weight-${idx}" placeholder="예) 230g 또는 0.23kg" value="${esc(o.weight||\'\')}">',
+              '<label class="fld req" style="margin-top:12px">용도</label><input type="text" id="cl-purpose-${idx}" value="${esc(o.purpose||\'\')}">': '<label class="fld req" style="margin-top:12px">용도</label><input type="text" id="cl-purpose-${idx}" placeholder="예) 일반 소비자 판매용, 업무용 테스트, 수리 후 재수출 등" value="${esc(o.purpose||\'\')}">',
+          }
+          changed = False
+          for old, new in replacements.items():
+              if old in s:
+                  s = s.replace(old, new)
+                  changed = True
+          if changed:
+              p.write_text(s, encoding='utf-8')
+          PY
+      - name: Commit patch
+        run: |
+          if git diff --quiet; then
+            echo "No changes"
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add index.html
+          git commit -m "Add examples to classification fields"
+          git push
