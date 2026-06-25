@@ -1,0 +1,47 @@
+name: Fix importer label
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - main
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Replace importer wording in classification form
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          p = Path('index.html')
+          s = p.read_text(encoding='utf-8')
+          replacements = {
+              '<label class="fld req" style="margin-top:10px">수입자</label>': '<label class="fld req" style="margin-top:10px">최종사용자</label>',
+              'placeholder="기타 수입자, 여러 곳이면 쉼표로 구분"': 'placeholder="기타 최종사용자, 여러 곳이면 쉼표로 구분"',
+              '<li>수입자: ${esc(importers.join(\', \'))}</li>': '<li>최종사용자: ${esc(importers.join(\', \'))}</li>',
+              "errs.push('수입자 선택 또는 입력')": "errs.push('최종사용자 선택 또는 입력')",
+          }
+          changed = False
+          for old, new in replacements.items():
+              if old in s:
+                  s = s.replace(old, new)
+                  changed = True
+          if changed:
+              p.write_text(s, encoding='utf-8')
+          PY
+      - name: Commit patch
+        run: |
+          if git diff --quiet; then
+            echo "No changes"
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add index.html
+          git commit -m "Rename importer label to end user"
+          git push
