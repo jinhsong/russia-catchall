@@ -1,0 +1,38 @@
+name: Fix mobile invoice layout
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - main
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Improve mobile invoice item layout
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          p = Path('index.html')
+          s = p.read_text(encoding='utf-8')
+          css = """\n@media(max-width:560px){#card-prenotif .scrollx{overflow:visible;border:0;background:transparent;box-shadow:none}#card-prenotif table.grid{display:block;border:0;background:transparent}#card-prenotif table.grid tbody,#card-prenotif table.grid tr,#card-prenotif table.grid td{display:block;width:100%}#card-prenotif table.grid tr:first-child{display:none}#card-prenotif table.grid tr{margin:12px 0;padding:13px;border:1px solid var(--line);border-radius:12px;background:#fff}#card-prenotif table.grid td{border:0!important;padding:7px 0!important}#card-prenotif table.grid td:before{display:block;margin-bottom:5px;font-size:12px;font-weight:800;color:var(--soft)}#card-prenotif table.grid td:nth-child(1):before{content:'모델 선택'}#card-prenotif table.grid td:nth-child(2):before{content:'품목 후보'}#card-prenotif table.grid td:nth-child(3):before{content:'수량'}#card-prenotif table.grid td:nth-child(4):before{content:'단가(USD)'}#card-prenotif table.grid td:nth-child(5):before{content:'유무상'}#card-prenotif table.grid td:nth-child(6):before{content:'삭제'}#card-prenotif table.grid select,#card-prenotif table.grid input{width:100%;min-width:0;height:46px}#card-prenotif table.grid .btn{width:100%;height:42px}#card-prenotif .toolbar .btn{min-height:44px}}\n"""
+          if "#card-prenotif table.grid td:nth-child(1):before" not in s:
+              s = s.replace('</style>', css + '</style>', 1)
+              p.write_text(s, encoding='utf-8')
+          PY
+      - name: Commit patch
+        run: |
+          if git diff --quiet; then
+            echo "No changes"
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add index.html
+          git commit -m "Improve mobile invoice item layout"
+          git push
