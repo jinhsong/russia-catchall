@@ -1,0 +1,59 @@
+name: Patch suspicion UI
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - main
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Patch suspicion UI
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          import re
+          p = Path('index.html')
+          s = p.read_text(encoding='utf-8')
+          original = s
+
+          s = s.replace("function currentIndicators(){const a=[];if(hasGaRegionCountry())a.push({no:'0',text:GA_REGION_NOTICE});INDICATORS.forEach((t,i)=>a.push({no:String(i+1),text:t}));return a}",
+                        "function currentIndicators(){return INDICATORS.map((t,i)=>({no:String(i+1),text:t}))}")
+
+          s = s.replace('<div id="sanctions-body"></div><div class="divider"></div><h3 class="serif" style="font-size:15px">최종사용자 정보</h3><div id="enduser-body"></div><div class="divider"></div><h3 class="serif" style="font-size:15px">상황허가 의심징후</h3>',
+                        '<div id="sanctions-body"></div><div class="divider"></div><h3 class="serif" style="font-size:15px">상황허가 의심징후</h3>')
+
+          s = s.replace("if(!countries.length)errs.push('수입국 선택');if(!importers.length)errs.push('최종사용자 선택 또는 입력');",
+                        "if(!countries.length)errs.push('수입국 선택');if(countries.includes('벨라루스')&&!($('#imp-etc')?.value||'').trim()){addErr($('#imp-etc'),'벨라루스 최종사용자 입력');errs.push('벨라루스 최종사용자 입력')}if(!importers.length)errs.push('최종사용자 선택 또는 입력');")
+
+          old = r"""
+$('#enduser-body').innerHTML=`<label class="chk on"><input type="checkbox" id="eu-same" checked> 모든 품목에 동일한 최종사용자 적용</label><div class="row"><div class="col"><label class="fld req">최종사용자</label><input type="text" id="eu-name" value="${esc(state.enduser.name)}"></div><div class="col"><label class="fld">수입국</label><input type="text" id="eu-country" value="${esc(state.enduser.country)}"></div></div><label class="fld" style="margin-top:10px">사업 분야 / 활용 분야</label><input type="text" id="eu-business" value="${esc(state.enduser.business)}">`;const inds=currentIndicators();$('#indicators-body').innerHTML=inds.map((o,i)=>`<label class="radio"><input type="checkbox" id="ind-${i}" ${state.indicators[i]?'checked':''}><span><b>#${esc(o.no)}</b> ${esc(o.text)}</span></label>`).join('');$$('#indicators-body .radio').forEach(l=>{const cb=l.querySelector('input');l.classList.toggle('on',cb.checked);cb.onchange=()=>l.classList.toggle('on',cb.checked)})}$('#btn-screen-next').onclick=()=>{state.enduser={same:true,name:$('#eu-name').value.trim(),country:$('#eu-country').value.trim(),business:$('#eu-business').value.trim(),perModel:{}};if(!state.enduser.name){alert('최종사용자를 입력하세요.');return}state.indicators=currentIndicators().map((_,i)=>$('#ind-'+i).checked);state.screened=true;save();buildSummary();show('#card-summary')};
+""".strip()
+          new = r"""
+const inds=currentIndicators();$('#indicators-body').innerHTML=inds.map((o,i)=>`<div class="mcard"><div class="mbody"><div class="row" style="align-items:center"><div class="col"><b>#${esc(o.no)}</b> ${esc(o.text)}</div><div class="col" style="flex:0 0 180px"><label class="chk ${state.indicators[i]?'on':''}"><input type="radio" name="ind-${i}" value="yes" ${state.indicators[i]?'checked':''}> 예</label><label class="chk ${state.indicators[i]?'':'on'}"><input type="radio" name="ind-${i}" value="no" ${state.indicators[i]?'':'checked'}> 아니오</label></div></div></div></div>`).join('');$$('#indicators-body input[type=radio]').forEach(r=>r.onchange=()=>{$$(`input[name="${r.name}"]`).forEach(x=>x.closest('.chk').classList.toggle('on',x.checked))})}$('#btn-screen-next').onclick=()=>{state.indicators=currentIndicators().map((_,i)=>$(`input[name="ind-${i}"]:checked`)?.value==='yes');state.screened=true;save();buildSummary();show('#card-summary')};
+""".strip()
+          if old in s:
+              s = s.replace(old, new, 1)
+          else:
+              s = re.sub(r"\$\('#enduser-body'\)\.innerHTML=`.*?`;", "", s, count=1, flags=re.S)
+              s = re.sub(r"const inds=currentIndicators\(\);\$\('#indicators-body'\)\.innerHTML=.*?\}\)\}\$\('#btn-screen-next'\)\.onclick=\(\)=>\{.*?show\('#card-summary'\)\};", new, s, count=1, flags=re.S)
+
+          if s != original:
+              p.write_text(s, encoding='utf-8')
+          PY
+      - name: Commit patch
+        run: |
+          if git diff --quiet; then
+            exit 0
+          fi
+          git config user.name github-actions
+          git config user.email github-actions@github.com
+          git add index.html
+          git commit -m "Update suspicion checklist UI"
+          git push
