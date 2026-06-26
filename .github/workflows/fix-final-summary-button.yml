@@ -14,30 +14,49 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - name: Keep memo visible and style summary button
+      - name: Patch prenotification single party layout
         run: |
           python - <<'PY'
           from pathlib import Path
+          import re, base64
           p=Path('index.html')
           s=p.read_text(encoding='utf-8')
-          old="""        var summaryBtn=document.getElementById('cl-summary');
-        if(summaryBtn)summaryBtn.classList.add('primary');
-        setTimeout(function(){
-          buildSummary();
-          show('#card-summary');
-        },0);"""
-          new="""        var summaryBtn=document.getElementById('cl-summary');
-        if(summaryBtn){
-          summaryBtn.classList.remove('ghost');
-          summaryBtn.classList.add('final-summary');
-          summaryBtn.textContent='결과 요약으로 이동';
-          var tb=summaryBtn.closest('.toolbar');
-          if(tb)tb.classList.add('final-stage');
-        }"""
-          s=s.replace(old,new)
-          css='''\n.btn.final-summary{background:linear-gradient(135deg,var(--copper),#6f471d);border-color:#6f471d;color:#fff;box-shadow:0 8px 18px rgba(154,106,50,.22);padding:12px 20px;font-size:14px}.btn.final-summary:after{content:" →"}.toolbar.final-stage{border-top:1px solid var(--line);padding-top:14px;margin-top:18px}\n'''
-          if '.btn.final-summary' not in s:
-            s=s.replace('</style>',css+'</style>',1)
+          s=re.sub(r'\n?<script>\s*/\* prenotif-single-party-layout-v[0-9]+ \*/[\s\S]*?</script>\n?','',s)
+          payload='CjxzY3JpcHQ+Ci8qIHByZW5vdGlmLXNpbmdsZS1wYXJ0eS1sYXlvdXQtdjQgKi8KKGZ1bmN0aW9uKCl7CiAgZnVuY3Rpb24gc2V0UGFydHlWYWx1ZShpdix2YWwpewogICAgWydidXllcicsJ2NvbnNpZ25lZScsJ2VuZHVzZXInXS5mb3JFYWNoKGZ1bmN0aW9uKGspewogICAgICB2YXIgZWw9ZG9jdW1lbnQuZ2V0RWxlbWVudEJ5SWQoJ3BuLScraysnLScraXYpOwogICAgICBpZihlbCkgZWwudmFsdWU9dmFsOwogICAgfSk7CiAgICBpZih3aW5kb3cuc3RhdGUmJnN0YXRlLmludm9pY2VzJiZzdGF0ZS5pbnZvaWNlc1tpdl0pewogICAgICBzdGF0ZS5pbnZvaWNlc1tpdl0uYnV5ZXI9dmFsOwogICAgICBzdGF0ZS5pbnZvaWNlc1tpdl0uY29uc2lnbmVlPXZhbDsKICAgICAgc3RhdGUuaW52b2ljZXNbaXZdLmVuZFVzZXI9dmFsOwogICAgICBzdGF0ZS5pbnZvaWNlc1tpdl0ucnVzc2lhUGFydGllcz12YWw/W3ZhbF06W107CiAgICAgIHNhdmUoKTsKICAgIH0KICB9CiAgZnVuY3Rpb24gZW5mb3JjZVNpbmdsZVBhcnR5KGl2LCBzZWxlY3RlZCl7CiAgICB2YXIgY2hlY2tzPUFycmF5LmZyb20oZG9jdW1lbnQucXVlcnlTZWxlY3RvckFsbCgnW2RhdGEtcnVzc2lhLXBhcnR5PSInK2l2KyciXScpKTsKICAgIGlmKCFjaGVja3MubGVuZ3RoKSByZXR1cm47CiAgICBpZihzZWxlY3RlZCl7CiAgICAgIGNoZWNrcy5mb3JFYWNoKGZ1bmN0aW9uKHgpewogICAgICAgIGlmKHgudmFsdWUhPT1zZWxlY3RlZCkgeC5jaGVja2VkPWZhbHNlOwogICAgICAgIHZhciBsYWI9eC5jbG9zZXN0KCcuY2hrJyk7CiAgICAgICAgaWYobGFiKSBsYWIuY2xhc3NMaXN0LnRvZ2dsZSgnb24nLHguY2hlY2tlZCk7CiAgICAgIH0pOwogICAgICBzZXRQYXJ0eVZhbHVlKGl2LCBzZWxlY3RlZCk7CiAgICAgIHJldHVybjsKICAgIH0KICAgIHZhciBjaGVja2VkPWNoZWNrcy5maWx0ZXIoZnVuY3Rpb24oeCl7cmV0dXJuIHguY2hlY2tlZDt9KTsKICAgIGlmKGNoZWNrZWQubGVuZ3RoPjEpewogICAgICBjaGVja2VkLnNsaWNlKDEpLmZvckVhY2goZnVuY3Rpb24oeCl7eC5jaGVja2VkPWZhbHNlO30pOwogICAgfQogICAgY2hlY2tzLmZvckVhY2goZnVuY3Rpb24oeCl7CiAgICAgIHZhciBsYWI9eC5jbG9zZXN0KCcuY2hrJyk7CiAgICAgIGlmKGxhYikgbGFiLmNsYXNzTGlzdC50b2dnbGUoJ29uJyx4LmNoZWNrZWQpOwogICAgfSk7CiAgICB2YXIgdmFsPShjaGVja3MuZmluZChmdW5jdGlvbih4KXtyZXR1cm4geC5jaGVja2VkO30pfHx7fSkudmFsdWV8fCcnOwogICAgaWYodmFsKSBzZXRQYXJ0eVZhbHVlKGl2LHZhbCk7CiAgfQogIGZ1bmN0aW9uIGFwcGx5UHJlbm90aWZTaW5nbGVQYXJ0eUxheW91dCgpewogICAgZG9jdW1lbnQucXVlcnlTZWxlY3RvckFsbCgnW2RhdGEtZmlsbC1ydXNzaWEtcGFydHldJykuZm9yRWFjaChmdW5jdGlvbihidG4pe2J0bi5yZW1vdmUoKTt9KTsKICAgIGRvY3VtZW50LnF1ZXJ5U2VsZWN0b3JBbGwoJ1tpZF49InBuLXJ1c3NpYS1wYXJ0aWVzLSJdJykuZm9yRWFjaChmdW5jdGlvbihib3gpewogICAgICB2YXIgaXY9Ym94LmlkLnJlcGxhY2UoJ3BuLXJ1c3NpYS1wYXJ0aWVzLScsJycpOwogICAgICB2YXIgaGludD1ib3gucXVlcnlTZWxlY3RvcignLmhpbnQnKTsKICAgICAgaWYoaGludCkgaGludC50ZXh0Q29udGVudD0nU0VSQyD또는 SRR 중 하나만 선택할 수 있습니다. 선택 시 구매자, 최종수하인, 최종사용자에 자동 반영됩니다.';
+      enforceSingleParty(iv);
+    });
+    document.querySelectorAll('[data-russia-party]').forEach(function(ch){
+      if(ch.dataset.singlePartyBoundV4) return;
+      ch.dataset.singlePartyBoundV4='1';
+      ch.addEventListener('change',function(){
+        var iv=ch.dataset.russiaParty;
+        if(ch.checked) enforceSingleParty(iv,ch.value);
+        else enforceSingleParty(iv);
+      },true);
+    });
+  }
+  if(!document.getElementById('prenotif-col-width-style-v4')){
+    var style=document.createElement('style');
+    style.id='prenotif-col-width-style-v4';
+    style.textContent='@media(min-width:561px){#card-prenotif table.grid th:nth-child(1),#card-prenotif table.grid td:nth-child(1){width:32%;min-width:210px}#card-prenotif table.grid th:nth-child(2),#card-prenotif table.grid td:nth-child(2){width:29%;min-width:180px}#card-prenotif table.grid th:nth-child(3),#card-prenotif table.grid td:nth-child(3){width:8%;min-width:70px}#card-prenotif table.grid th:nth-child(4),#card-prenotif table.grid td:nth-child(4){width:9%;min-width:85px}#card-prenotif table.grid th:nth-child(5),#card-prenotif table.grid td:nth-child(5){width:10%;min-width:85px}#card-prenotif table.grid th:nth-child(6),#card-prenotif table.grid td:nth-child(6){width:8%;min-width:70px}#card-prenotif table.grid td:nth-child(3) input,#card-prenotif table.grid td:nth-child(4) input{padding-left:7px;padding-right:7px}}';
+    document.head.appendChild(style);
+  }
+  var oldRenderInvoices=window.renderInvoices;
+  if(typeof oldRenderInvoices==='function'&&!oldRenderInvoices.__singlePartyLayoutV4){
+    var wrapped=function(){
+      oldRenderInvoices.apply(this,arguments);
+      applyPrenotifSinglePartyLayout();
+    };
+    wrapped.__singlePartyLayoutV4=true;
+    window.renderInvoices=wrapped;
+  }
+  applyPrenotifSinglePartyLayout();
+})();
+</script>
+'
+          script=base64.b64decode(payload).decode('utf-8')
+          head,sep,tail=s.rpartition('</body>')
+          s=head+script+'\n'+sep+tail
           p.write_text(s,encoding='utf-8')
           PY
       - name: Commit patch
@@ -46,5 +65,5 @@ jobs:
           git config user.name github-actions
           git config user.email github-actions@github.com
           git add index.html
-          git commit -m "Keep memo visible before final summary"
+          git commit -m "Apply prenotification single-party layout"
           git push
