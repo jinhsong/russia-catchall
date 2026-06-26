@@ -1,0 +1,38 @@
+name: Patch classify skip summary
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - main
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Append classify skip summary override
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          import base64
+          p=Path('index.html')
+          s=p.read_text(encoding='utf-8')
+          marker='classify-skip-summary-v1'
+          payload='CjxzY3JpcHQ+Ci8qIGNsYXNzaWZ5LXNraXAtc3VtbWFyeS12MSAqLwooZnVuY3Rpb24oKXsKICBmdW5jdGlvbiBvbmx5UnVzc2lhU2VyY1NyckNsYXNzaWZ5KCl7CiAgICB2YXIgZCA9IHdpbmRvdy5zdGF0ZSAmJiBzdGF0ZS5jbGFzc2lmeURvYzsKICAgIGlmKCFkKSByZXR1cm4gZmFsc2U7CiAgICB2YXIgY291bnRyaWVzID0gKGQuY291bnRyaWVzIHx8IFtdKS5tYXAoZnVuY3Rpb24oeCl7IHJldHVybiBTdHJpbmcoeHx8JycpLnRyaW0oKTsgfSkuZmlsdGVyKEJvb2xlYW4pOwogICAgdmFyIHBhcnRpZXMgPSAoZC5pbXBvcnRlcnMgfHwgW10pLmZsYXRNYXAoZnVuY3Rpb24oeCl7IHJldHVybiBTdHJpbmcoeHx8JycpLnNwbGl0KC9bXG4sOy9dKy8pOyB9KS5tYXAoZnVuY3Rpb24oeCl7IHJldHVybiBTdHJpbmcoeHx8JycpLnRyaW0oKS50b1VwcGVyQ2FzZSgpOyB9KS5maWx0ZXIoQm9vbGVhbik7CiAgICBpZighKGNvdW50cmllcy5sZW5ndGggPT09IDEgJiYgY291bnRyaWVzWzBdID09PSAn65+s7Iuc7JWEJykpIHJldHVybiBmYWxzZTsKICAgIGlmKCFwYXJ0aWVzLmxlbmd0aCkgcmV0dXJuIGZhbHNlOwogICAgcmV0dXJuIHBhcnRpZXMuZXZlcnkoZnVuY3Rpb24oeCl7IHJldHVybiB4ID09PSAnU0VSQycgfHwgeCA9PT0gJ1NSUic7IH0pOwogIH0KICB2YXIgb3JpZ2luYWxSZW5kZXJDbGFzc2lmeURvYyA9IHdpbmRvdy5yZW5kZXJDbGFzc2lmeURvYzsKICBpZih0eXBlb2Ygb3JpZ2luYWxSZW5kZXJDbGFzc2lmeURvYyA9PT0gJ2Z1bmN0aW9uJyAmJiAhb3JpZ2luYWxSZW5kZXJDbGFzc2lmeURvYy5fX3NraXBTdW1tYXJ5V3JhcHBlZCl7CiAgICB2YXIgd3JhcHBlZCA9IGZ1bmN0aW9uKCl7CiAgICAgIG9yaWdpbmFsUmVuZGVyQ2xhc3NpZnlEb2MuYXBwbHkodGhpcywgYXJndW1lbnRzKTsKICAgICAgaWYob25seVJ1c3NpYVNlcmNTcnJDbGFzc2lmeSgpKXsKICAgICAgICB2YXIgc2NyZWVuQnRuID0gZG9jdW1lbnQuZ2V0RWxlbWVudEJ5SWQoJ2NsLXNjcmVlbicpOwogICAgICAgIGlmKHNjcmVlbkJ0bikgc2NyZWVuQnRuLnJlbW92ZSgpOwogICAgICAgIHZhciBzdW1tYXJ5QnRuID0gZG9jdW1lbnQuZ2V0RWxlbWVudEJ5SWQoJ2NsLXN1bW1hcnknKTsKICAgICAgICBpZihzdW1tYXJ5QnRuKSBzdW1tYXJ5QnRuLmNsYXNzTGlzdC5hZGQoJ3ByaW1hcnknKTsKICAgICAgICBzZXRUaW1lb3V0KGZ1bmN0aW9uKCl7CiAgICAgICAgICBidWlsZFN1bW1hcnkoKTsKICAgICAgICAgIHNob3coJyNjYXJkLXN1bW1hcnknKTsKICAgICAgICB9LCAwKTsKICAgICAgfQogICAgfTsKICAgIHdyYXBwZWQuX19za2lwU3VtbWFyeVdyYXBwZWQgPSB0cnVlOwogICAgd2luZG93LnJlbmRlckNsYXNzaWZ5RG9jID0gd3JhcHBlZDsKICB9Cn0pKCk7Cjwvc2NyaXB0Pgo='
+          script=base64.b64decode(payload).decode('utf-8')
+          if marker not in s:
+              s=s.replace('</body>',script+'\n</body>',1)
+              p.write_text(s,encoding='utf-8')
+          PY
+      - name: Commit patch
+        run: |
+          if git diff --quiet; then exit 0; fi
+          git config user.name github-actions
+          git config user.email github-actions@github.com
+          git add index.html
+          git commit -m "Skip suspicion for Russia SERC SRR classify"
+          git push
