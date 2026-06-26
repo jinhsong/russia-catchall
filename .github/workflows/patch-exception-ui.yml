@@ -1,0 +1,41 @@
+name: Patch exception UI
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - main
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Patch file
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          import base64, re
+          p = Path('index.html')
+          s = p.read_text(encoding='utf-8')
+          original = s
+          options = base64.b64decode('Y29uc3QgRVhDRVBUSU9OX09QVElPTlM9W3tpZDonY29uc3VtZXInLHRpdGxlOifshozruYTsnpAg7Ya17Iug7KCc7ZKIIOuTsSDqsbDrnpgnLGRlc2M6J+ydvOuwmCDshozruYTsnpDqsIAg7IKs7Jqp7ZWY64qUIO2DnOu4lOumvywg64W47Yq467aBLCDsiqTrp4jtirjtj7AsIOuniOydtO2BrCwg7Iqk7ZS87LukLCDtl6Trk5ztj7AsIOuqqOuLiO2EsCwg7ZSE66aw7YSwLCDtgqTrs7Trk5wsIOuniOyasOyKpCwg65SU7KeA7YS47Lm066mU6528LCBUVi/rnbzrlJTsmKQg7IiY7Iug6riwLCDshYvthrHrsJXsiqQg67CPIOuFueydjCDsnqXsuZgg65OxLiDsgqzsoITsi6Dqs6Dsi5wgNuqwnOyblCDsnbTrgrQg7Lac7IucIO2ZleyVveyEnCjsgrDsl4XthrXsg4HrtoApIOyEnOuqheuzuCDssqjrtoAg7ZWE7JqUJ30se2lkOidtZWRpY2FsJyx0aXRsZTon7J2Y66OM6riw6riwIOuwjyDsnZjro4zquLDquLAg7KCE7JqpIOu2gO2SiCwg67aA67aE7ZKIIOuTsSDqsbDrnpgnLGRlc2M6J+ydmOujjOq4sOq4sCDrsI8g7J2Y66OM6riw6riwIOyghOyaqSDrtoDtkogsIOu2gOu2hO2SiCDrk7Eg6rGw656YLiDsgqzsoITsi6Dqs6DshJwg7JaR7Iud7IOBICLsiJjstpwg7ZuEIOyekeyEsSDtlYTsmpQiIDMw67KIIO2VreuqqeyXkCDshKTsuZgg7ZuEIDMw7J28IOuCtCDshKTsuZjtmZXsnbjshJwg7KCc7LacKDHtmowpLCDshKTsuZgg7ZuEIOuwmOq4sOuzhCDsnbTtlonsoJDqsoDrs7Tqs6DshJwg7KCc7LacKOyXsCAy7ZqMKSDrk7Eg7LWc7KKF7IKs7Jqp7J6QIOuwjyDsgqzsmqnsmqnrj4Trpbwg7J6F7Kad7ZWgIOyImCDsnojripQg7LaU6rCAIOymneu5mSDsoJzstpwg7ZWE7JqUJ30se2lkOidyZXR1cm4nLHRpdGxlOifri7nstIgg7IiY7Lac7J6Q7JeQ6rKMIOuwmOyGoScsZGVzYzon7IiY7J6F7ZWcIOusvO2SiOydhCDqt7gg7KCc7KGw7JeF7LK0IOuYkOuKlCDri7nstIgg7Jm46rWt7J2YIOyImOy2nOyekOyXkOqyjCDri6Tsi5wg67CY7Iah7ZWY64qUIOqyveyasCd9LHtpZDonZXhoaWJpdGlvbicsdGl0bGU6J+2VtOyZuCDrsJXrnoztmowg67CPIOyghOyLnO2ajCDstpztkognLGRlc2M6J+uwleuejO2ajCwg6rKs67O47ZqMLCDsoITsi5ztmowg65Ox7JeQIOy2nO2SiO2VoCDrqqnsoIHsnLzroZwg7IiY7Lac7ZWcIO2bhCAx64WEIOydtOuCtOyXkCDsnqzsiJjsnoXtlZjqsbDrgpggMeuFhCDsnbTrgrTsl5Ag7ZW07Jm4IO2YhOyngOyXkOyEnCDtj5DquLDtlZjripQg6rK97JqwJ30se2lkOidyZXBhaXInLHRpdGxlOifrs7TsoJUsIOyImOumrCwg6rKA7IKsLCDsi5ztl5gg66qp7KCBIOyImOy2nCcsZGVzYzon67O07KCVLCDsiJjrpqwsIOqygOyCrCwg7Iuc7ZeY7J2EIOuwm+ydhCDrqqnsoIHsnLzroZwg7IiY7Lac7ZWcIO2bhCAx64WEIOydtOuCtOyXkCDsnqzsiJjsnoXtlZjqsbDrgpgg7ZiE7KeAIO2PkOq4sO2VmOuKlCDqsr3smrAnfSx7aWQ6J25vbmUnLHRpdGxlOiftlbTri7kg7JeG7J2MJyxkZXNjOifsnIQg7ZeI6rCA7JiI7Jm47JeQIO2VtOuLue2VmOyngCDslYrsirXri4jri6QuJ31dOw==').decode('utf-8')
+          panel = base64.b64decode('PGRldGFpbHMgY2xhc3M9ImRiLXBhbmVsIj48c3VtbWFyeT7tjJDsoJUg642w7J207YSwIO2DkeyerCDsg4Htg5w8L3N1bW1hcnk+PGRpdiBjbGFzcz0iY2FyZCI+PGRpdiBpZD0iZGItc3RhdHVzIj48L2Rpdj48L2Rpdj48L2RldGFpbHM+').decode('utf-8')
+          s = re.sub(r'const EXCEPTION_OPTIONS=\[.*?\];\nconst INDICATORS', options + '\nconst INDICATORS', s, count=1, flags=re.S)
+          s = re.sub(r'<details class="db-panel">.*?</details><div class="footer">', panel + '<div class="footer">', s, count=1, flags=re.S)
+          if s != original:
+              p.write_text(s, encoding='utf-8')
+          PY
+      - name: Commit
+        run: |
+          if git diff --quiet; then
+            exit 0
+          fi
+          git config user.name github-actions
+          git config user.email github-actions@github.com
+          git add index.html
+          git commit -m "Update exception guidance and remove DB upload inputs"
+          git push
