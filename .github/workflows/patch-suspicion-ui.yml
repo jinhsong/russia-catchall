@@ -14,46 +14,25 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - name: Patch suspicion UI
+      - name: Append override script
         run: |
           python - <<'PY'
           from pathlib import Path
-          import re
-          p = Path('index.html')
-          s = p.read_text(encoding='utf-8')
-          original = s
-
-          s = s.replace("function currentIndicators(){const a=[];if(hasGaRegionCountry())a.push({no:'0',text:GA_REGION_NOTICE});INDICATORS.forEach((t,i)=>a.push({no:String(i+1),text:t}));return a}",
-                        "function currentIndicators(){return INDICATORS.map((t,i)=>({no:String(i+1),text:t}))}")
-
-          s = s.replace('<div id="sanctions-body"></div><div class="divider"></div><h3 class="serif" style="font-size:15px">최종사용자 정보</h3><div id="enduser-body"></div><div class="divider"></div><h3 class="serif" style="font-size:15px">상황허가 의심징후</h3>',
-                        '<div id="sanctions-body"></div><div class="divider"></div><h3 class="serif" style="font-size:15px">상황허가 의심징후</h3>')
-
-          s = s.replace("if(!countries.length)errs.push('수입국 선택');if(!importers.length)errs.push('최종사용자 선택 또는 입력');",
-                        "if(!countries.length)errs.push('수입국 선택');if(countries.includes('벨라루스')&&!($('#imp-etc')?.value||'').trim()){addErr($('#imp-etc'),'벨라루스 최종사용자 입력');errs.push('벨라루스 최종사용자 입력')}if(!importers.length)errs.push('최종사용자 선택 또는 입력');")
-
-          old = r"""
-$('#enduser-body').innerHTML=`<label class="chk on"><input type="checkbox" id="eu-same" checked> 모든 품목에 동일한 최종사용자 적용</label><div class="row"><div class="col"><label class="fld req">최종사용자</label><input type="text" id="eu-name" value="${esc(state.enduser.name)}"></div><div class="col"><label class="fld">수입국</label><input type="text" id="eu-country" value="${esc(state.enduser.country)}"></div></div><label class="fld" style="margin-top:10px">사업 분야 / 활용 분야</label><input type="text" id="eu-business" value="${esc(state.enduser.business)}">`;const inds=currentIndicators();$('#indicators-body').innerHTML=inds.map((o,i)=>`<label class="radio"><input type="checkbox" id="ind-${i}" ${state.indicators[i]?'checked':''}><span><b>#${esc(o.no)}</b> ${esc(o.text)}</span></label>`).join('');$$('#indicators-body .radio').forEach(l=>{const cb=l.querySelector('input');l.classList.toggle('on',cb.checked);cb.onchange=()=>l.classList.toggle('on',cb.checked)})}$('#btn-screen-next').onclick=()=>{state.enduser={same:true,name:$('#eu-name').value.trim(),country:$('#eu-country').value.trim(),business:$('#eu-business').value.trim(),perModel:{}};if(!state.enduser.name){alert('최종사용자를 입력하세요.');return}state.indicators=currentIndicators().map((_,i)=>$('#ind-'+i).checked);state.screened=true;save();buildSummary();show('#card-summary')};
-""".strip()
-          new = r"""
-const inds=currentIndicators();$('#indicators-body').innerHTML=inds.map((o,i)=>`<div class="mcard"><div class="mbody"><div class="row" style="align-items:center"><div class="col"><b>#${esc(o.no)}</b> ${esc(o.text)}</div><div class="col" style="flex:0 0 180px"><label class="chk ${state.indicators[i]?'on':''}"><input type="radio" name="ind-${i}" value="yes" ${state.indicators[i]?'checked':''}> 예</label><label class="chk ${state.indicators[i]?'':'on'}"><input type="radio" name="ind-${i}" value="no" ${state.indicators[i]?'':'checked'}> 아니오</label></div></div></div></div>`).join('');$$('#indicators-body input[type=radio]').forEach(r=>r.onchange=()=>{$$(`input[name="${r.name}"]`).forEach(x=>x.closest('.chk').classList.toggle('on',x.checked))})}$('#btn-screen-next').onclick=()=>{state.indicators=currentIndicators().map((_,i)=>$(`input[name="ind-${i}"]:checked`)?.value==='yes');state.screened=true;save();buildSummary();show('#card-summary')};
-""".strip()
-          if old in s:
-              s = s.replace(old, new, 1)
-          else:
-              s = re.sub(r"\$\('#enduser-body'\)\.innerHTML=`.*?`;", "", s, count=1, flags=re.S)
-              s = re.sub(r"const inds=currentIndicators\(\);\$\('#indicators-body'\)\.innerHTML=.*?\}\)\}\$\('#btn-screen-next'\)\.onclick=\(\)=>\{.*?show\('#card-summary'\)\};", new, s, count=1, flags=re.S)
-
-          if s != original:
-              p.write_text(s, encoding='utf-8')
+          import base64
+          p=Path('index.html')
+          s=p.read_text(encoding='utf-8')
+          marker='suspicion-ui-override-v1'
+          payload='CjxzY3JpcHQ+Ci8qIHN1c3BpY2lvbi11aS1vdmVycmlkZS12MSAqLwooZnVuY3Rpb24oKXsKICB3aW5kb3cuY3VycmVudEluZGljYXRvcnM9ZnVuY3Rpb24oKXtyZXR1cm4gSU5ESUNBVE9SUy5tYXAoZnVuY3Rpb24odCxpKXtyZXR1cm4ge25vOlN0cmluZyhpKzEpLHRleHQ6dH07fSk7fTsKCiAgY29uc3QgY2xhc3NpZnlCdG49ZG9jdW1lbnQuZ2V0RWxlbWVudEJ5SWQoJ2J0bi1jbGFzc2lmeS1nZW4nKTsKICBpZihjbGFzc2lmeUJ0biYmIWNsYXNzaWZ5QnRuLmRhdGFzZXQuYmVsYXJ1c0d1YXJkKXsKICAgIGNsYXNzaWZ5QnRuLmRhdGFzZXQuYmVsYXJ1c0d1YXJkPScxJzsKICAgIGNsYXNzaWZ5QnRuLmFkZEV2ZW50TGlzdGVuZXIoJ2NsaWNrJyxmdW5jdGlvbihlKXsKICAgICAgY29uc3QgY291bnRyaWVzPXNlbGVjdGVkQ291bnRyaWVzKCk7CiAgICAgIGNvbnN0IGV0Yz1kb2N1bWVudC5nZXRFbGVtZW50QnlJZCgnaW1wLWV0YycpOwogICAgICBpZihjb3VudHJpZXMuaW5jbHVkZXMoJ1x1QkNBOFx1Qjc3Q1x1QjhFOFx1QzJBNCcpJiZldGMmJiFldGMudmFsdWUudHJpbSgpKXsKICAgICAgICBjbGVhckVycm9ycyhkb2N1bWVudC5nZXRFbGVtZW50QnlJZCgnY2FyZC1jbGFzc2lmeScpKTsKICAgICAgICBhZGRFcnIoZXRjLCdcdUJDQThcdUI3N0NcdUI4RThcdUMyQTQgXHVDRDVDXHVDODg1XHVDMEFDXHVDNkE5XHVDNzkwIFx1Qzc4NVx1QjgyNScpOwogICAgICAgIGRvY3VtZW50LmdldEVsZW1lbnRCeUlkKCdjbGFzc2lmeS1kb2Mtb3V0JykuaW5uZXJIVE1MPW5vdGUoJ2RhbmdlcicsJ1x1Qzc4NVx1QjgyNVx1Qzc0NCBcdUQ2NTVcdUM3NzhcdUQ1NThcdUMxMzhcdUM2OTQuPHVsPjxsaT5cdUJDQThcdUI3N0NcdUI4RThcdUMyQTQgXHVDRDVDXHVDODg1XHVDMEFDXHVDNkE5XHVDNzkwIFx1Qzc4NVx1QjgyNTwvbGk+PC91bD4nKTsKICAgICAgICBlLnByZXZlbnREZWZhdWx0KCk7CiAgICAgICAgZS5zdG9wSW1tZWRpYXRlUHJvcGFnYXRpb24oKTsKICAgICAgfQogICAgfSx0cnVlKTsKICB9CgogIHdpbmRvdy5idWlsZFNjcmVlbj1mdW5jdGlvbigpewogICAgY29uc3QgaXRlbXM9c2NyZWVuVGFyZ2V0cygpOwogICAgc3RhdGUuc2FuY3Rpb25zSGl0cz1bXTsKICAgIGNvbnN0IGV1PWRvY3VtZW50LmdldEVsZW1lbnRCeUlkKCdlbmR1c2VyLWJvZHknKTsKICAgIGlmKGV1KXsKICAgICAgZXUuaW5uZXJIVE1MPTEnOwogICAgICBjb25zdCBoPWV1LnByZXZpb3VzRWxlbWVudFNpYmxpbmc7CiAgICAgIGNvbnN0IGQ9aCYmaC5wcmV2aW91c0VsZW1lbnRTaWJsaW5nOwogICAgICBpZihoKWguc3R5bGUuZGlzcGxheT0nbm9uZSc7CiAgICAgIGlmKGQmJmQuY2xhc3NMaXN0JiZkLmNsYXNzTGlzdC5jb250YWlucygnZGl2aWRlcicpKWQuc3R5bGUuZGlzcGxheT0nbm9uZSc7CiAgICB9CiAgICBjb25zdCBzYj1kb2N1bWVudC5nZXRFbGVtZW50QnlJZCgnc2FuY3Rpb25zLWJvZHknKTsKICAgIHNiLmlubmVySFRNTD1pdGVtcy5sZW5ndGg/bm90ZSgnaW5mbycsYFx1QjMwMFx1QzBDMSBcdUJBQThcdUIzNzg6IDxiPiR7ZXNjKGl0ZW1zLm1hcCh4PT54Lm1vZGVsKS5qb2luKCcsICcpKX08L2I+YCk6bm90ZSgnaW5mbycsJ1x1Qzc1OFx1QzJFQ1x1QzlENVx1RDZDNCBcdUM4MTBcdUFDODAgXHVCMzAwXHVDMEMxIFx1QkFBOFx1QjM3OFx1Qzc3NCBcdUM1QzZcdUMyQjVcdUIyQzhcdUIyRTQuJyk7CiAgICBpdGVtcy5mb3JFYWNoKGZ1bmN0aW9uKEwpewogICAgICBjb25zdCBoaXQ9REIuc2FuY3Rpb25zLmZpbmQoZnVuY3Rpb24ocil7cmV0dXJuIGhzTWF0Y2goTC5ocyxGLmhzKHIpKTt9KTsKICAgICAgaWYoaGl0KXN0YXRlLnNhbmN0aW9uc0hpdHMucHVzaCh7bW9kZWw6TC5tb2RlbCxoczpMLmhzLGRlc2M6Ri5kZXNjKGhpdCl9KTsKICAgICAgc2IuaW5zZXJ0QWRqYWNlbnRIVE1MKCdiZWZvcmVlbmQnLGA8ZGl2IGNsYXNzPSJtY2FyZCI+PGRpdiBjbGFzcz0ibWhlYWQiPjxzcGFuIGNsYXNzPSJtbmFtZSI+JHtlc2MoTC5tb2RlbCl9PC9zcGFuPiR7YmFkZ2UoaGl0PydkYW5nZXInOidvaycsaGl0PydcdUM4MUNcdUM3QUMgSFMgXHVCOUU0XHVDRTZEJzonXHVDODFDXHVDN0FDIEhTIFx1QkJGOFx1QjlFNFx1Q0U2RCcpfTwvZGl2PjxkaXYgY2xhc3M9Im1ib2R5Ij4ke2hpdD9gSFMgJHtlc2MoTC5ocyl9IMK3ICR7ZXNjKEYuZGVzYyhoaXQpKX1gOidcdUIzMDBcdUI3RUMgXHVDODFDXHVDN0FDXHVCMzAwXHVDMEMxIEhTXHVDNUQwIFx1QjlFNFx1Q0U2RFx1QjQxOFx1QzlDMCBcdUM1NEFcdUM1NThcdUMyQjVcdUIyQzhcdUIyRTQuJ308L2Rpdj48L2Rpdj5gKTsKICAgIH0pOwogICAgY29uc3QgaW5kcz1jdXJyZW50SW5kaWNhdG9ycygpOwogICAgZG9jdW1lbnQuZ2V0RWxlbWVudEJ5SWQoJ2luZGljYXRvcnMtYm9keScpLmlubmVySFRNTD1pbmRzLm1hcChmdW5jdGlvbihvLGkpewogICAgICBjb25zdCB5ZXM9ISFzdGF0ZS5pbmRpY2F0b3JzW2ldOwogICAgICByZXR1cm4gYDxkaXYgY2xhc3M9Im1jYXJkIj48ZGl2IGNsYXNzPSJtYm9keSI+PGRpdiBjbGFzcz0icm93IiBzdHlsZT0iYWxpZ24taXRlbXM6Y2VudGVyIj48ZGl2IGNsYXNzPSJjb2wiPjxiPiMke2VzYyhvLm5vKX08L2I+ICR7ZXNjKG8udGV4dCl9PC9kaXY+PGRpdiBjbGFzcz0iY29sIiBzdHlsZT0iZmxleDowIDAgMTkwcHgiPjxsYWJlbCBjbGFzcz0iY2hrICR7eWVzPydvbic6Jyd9Ij48aW5wdXQgdHlwZT0icmFkaW8iIG5hbWU9ImluZC0ke2l9IiB2YWx1ZT0ieWVzIiAke3llcz8nY2hlY2tlZCc6Jyd9PiBcdUM2MDg8L2xhYmVsPjxsYWJlbCBjbGFzcz0iY2hrICR7eWVzPycnOidvbid9Ij48aW5wdXQgdHlwZT0icmFkaW8iIG5hbWU9ImluZC0ke2l9IiB2YWx1ZT0ibm8iICR7eWVzPycnOidjaGVja2VkJ30+IFx1QzU0NFx1QjJDOFx1QzYyNDwvbGFiZWw+PC9kaXY+PC9kaXY+PC9kaXY+PC9kaXY+YDsKICAgIH0pLmpvaW4oJycpOwogICAgZG9jdW1lbnQucXVlcnlTZWxlY3RvckFsbCgnI2luZGljYXRvcnMtYm9keSBpbnB1dFt0eXBlPXJhZGlvXScpLmZvckVhY2goZnVuY3Rpb24ocil7CiAgICAgIHIub25jaGFuZ2U9ZnVuY3Rpb24oKXtkb2N1bWVudC5xdWVyeVNlbGVjdG9yQWxsKGBpbnB1dFtuYW1lPSIke3IubmFtZX0iXWApLmZvckVhY2goZnVuY3Rpb24oeCl7eC5jbG9zZXN0KCcuY2hrJykuY2xhc3NMaXN0LnRvZ2dsZSgnb24nLHguY2hlY2tlZCk7fSk7fTsKICAgIH0pOwogIH07CgogIGNvbnN0IHNjcmVlbk5leHQ9ZG9jdW1lbnQuZ2V0RWxlbWVudEJ5SWQoJ2J0bi1zY3JlZW4tbmV4dCcpOwogIGlmKHNjcmVlbk5leHQpewogICAgc2NyZWVuTmV4dC5vbmNsaWNrPWZ1bmN0aW9uKCl7CiAgICAgIHN0YXRlLmluZGljYXRvcnM9Y3VycmVudEluZGljYXRvcnMoKS5tYXAoZnVuY3Rpb24oXyxpKXtyZXR1cm4gZG9jdW1lbnQucXVlcnlTZWxlY3RvcihgaW5wdXRbbmFtZT0iaW5kLSR7aX0iXTpjaGVja2VkYCk/LnZhbHVlPT09J3llcyc7fSk7CiAgICAgIHN0YXRlLnNjcmVlbmVkPXRydWU7CiAgICAgIHNhdmUoKTsKICAgICAgYnVpbGRTdW1tYXJ5KCk7CiAgICAgIHNob3coJyNjYXJkLXN1bW1hcnknKTsKICAgIH07CiAgfQp9KSgpOwo8L3NjcmlwdD4K'
+          script=base64.b64decode(payload).decode('utf-8')
+          if marker not in s:
+              s=s.replace('</body>',script+'\n</body>',1)
+              p.write_text(s,encoding='utf-8')
           PY
       - name: Commit patch
         run: |
-          if git diff --quiet; then
-            exit 0
-          fi
+          if git diff --quiet; then exit 0; fi
           git config user.name github-actions
           git config user.email github-actions@github.com
           git add index.html
-          git commit -m "Update suspicion checklist UI"
+          git commit -m "Apply suspicion UI override"
           git push
