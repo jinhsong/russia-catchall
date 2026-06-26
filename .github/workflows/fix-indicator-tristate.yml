@@ -1,0 +1,38 @@
+name: Fix indicator tristate
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - main
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Make indicator answers explicit
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          p=Path('index.html')
+          s=p.read_text(encoding='utf-8')
+          original=s
+          s=s.replace("      var yes=!!state.indicators[i];\n      return '<div class=\"mcard\"><div class=\"mbody\"><div class=\"row\" style=\"align-items:center\"><div class=\"col\"><b>#'+esc(o.no)+'</b> '+esc(o.text)+'</div><div class=\"col\" style=\"flex:0 0 190px\"><label class=\"chk '+(yes?'on':'')+'\"><input type=\"radio\" name=\"ind-'+i+'\" value=\"yes\" '+(yes?'checked':'')+'> 예</label><label class=\"chk '+(yes?'':'on')+'\"><input type=\"radio\" name=\"ind-'+i+'\" value=\"no\" '+(yes?'':'checked')+'> 아니오</label></div></div></div></div>';",
+"      var hasAnswer=!!state.screened&&state.indicators&&state.indicators.length>i;\n      var yes=hasAnswer&&state.indicators[i]===true;\n      var no=hasAnswer&&state.indicators[i]===false;\n      return '<div class=\"mcard\"><div class=\"mbody\"><div class=\"row\" style=\"align-items:center\"><div class=\"col\"><b>#'+esc(o.no)+'</b> '+esc(o.text)+'</div><div class=\"col\" style=\"flex:0 0 190px\"><label class=\"chk '+(yes?'on':'')+'\"><input type=\"radio\" name=\"ind-'+i+'\" value=\"yes\" '+(yes?'checked':'')+'> 예</label><label class=\"chk '+(no?'on':'')+'\"><input type=\"radio\" name=\"ind-'+i+'\" value=\"no\" '+(no?'checked':'')+'> 아니오</label></div></div></div></div>';")
+          s=s.replace("        state.indicators=currentIndicators().map(function(_,i){\n          var v=document.querySelector('input[name=\"ind-'+i+'\"]:checked');\n          return v&&v.value==='yes';\n        });\n        state.screened=true;",
+"        var missing=[];\n        state.indicators=currentIndicators().map(function(o,i){\n          var v=document.querySelector('input[name=\"ind-'+i+'\"]:checked');\n          if(!v)missing.push(o.no);\n          return v&&v.value==='yes';\n        });\n        if(missing.length){alert('의심징후 항목의 예/아니오를 모두 선택하세요. 미선택: '+missing.join(', '));return}\n        state.screened=true;")
+          if s!=original:
+              p.write_text(s,encoding='utf-8')
+          PY
+      - name: Commit patch
+        run: |
+          if git diff --quiet; then exit 0; fi
+          git config user.name github-actions
+          git config user.email github-actions@github.com
+          git add index.html
+          git commit -m "Require explicit suspicion answers"
+          git push
