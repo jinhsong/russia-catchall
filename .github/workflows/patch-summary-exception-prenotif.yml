@@ -14,153 +14,15 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - name: Append UX override
+      - name: Append marker
         run: |
           python - <<'PY'
           from pathlib import Path
           p=Path('index.html')
           s=p.read_text(encoding='utf-8')
-          marker='summary-exception-prenotif-v1'
-          script=r'''
-<script>
-/* summary-exception-prenotif-v1 */
-(function(){
-  function installSummaryCleanup(){
-    var oldReport=window.reportHTML;
-    if(typeof oldReport==='function'&&!oldReport.__summaryCleanupV1){
-      var wrapped=function(){
-        var html=oldReport.apply(this,arguments);
-        try{
-          var doc=new DOMParser().parseFromString(html,'text/html');
-          doc.querySelectorAll('h2,h3,h4').forEach(function(h){
-            if(/최종사용자 정보|사업 분야|활용 분야/.test(h.textContent||'')){
-              var n=h.nextSibling;
-              while(n){
-                var next=n.nextSibling;
-                if(n.nodeType===1 && /^H[234]$/.test(n.tagName)) break;
-                n.parentNode&&n.parentNode.removeChild(n);
-                n=next;
-              }
-              h.remove();
-            }
-          });
-          doc.querySelectorAll('tr').forEach(function(tr){
-            var t=tr.textContent||'';
-            if(/사업 분야|활용 분야/.test(t)) tr.remove();
-          });
-          return '<!doctype html>\n'+doc.documentElement.outerHTML;
-        }catch(e){
-          return html.replace(/<h[234][^>]*>[^<]*(?:최종사용자 정보|사업 분야|활용 분야)[\s\S]*?(?=<h[234]|<\/body>)/g,'');
-        }
-      };
-      wrapped.__summaryCleanupV1=true;
-      window.reportHTML=wrapped;
-    }
-  }
-
-  function fixedCandidate(model,idx){
-    var cs=candidates(model)||[];
-    var c=cs[idx]||cs[0]||{};
-    return (c.item||model||'-')+' / HS '+(c.hs||'-')+' / '+(c.source||'판정결과');
-  }
-
-  function fillRussiaParties(iv){
-    var vals=Array.from(document.querySelectorAll('[data-russia-party="'+iv+'"]')).filter(function(x){return x.checked;}).map(function(x){return x.value;});
-    if(!vals.length) return;
-    var v=vals.join(', ');
-    ['buyer','consignee','enduser'].forEach(function(k){
-      var el=document.getElementById('pn-'+k+'-'+iv);
-      if(el) el.value=v;
-    });
-    if(state.invoices&&state.invoices[iv]){
-      state.invoices[iv].buyer=v;
-      state.invoices[iv].consignee=v;
-      state.invoices[iv].endUser=v;
-      state.invoices[iv].russiaParties=vals;
-      save();
-    }
-  }
-
-  function enhancePrenotif(){
-    document.querySelectorAll('#pn-invoices table.grid').forEach(function(tbl){
-      var th=tbl.querySelector('tr th:nth-child(2)');
-      if(th) th.textContent='확정 품목';
-    });
-    document.querySelectorAll('[id^="pn-cand-"]').forEach(function(sel){
-      if(sel.tagName!=='SELECT') return;
-      var parts=sel.id.replace('pn-cand-','').split('-');
-      var iv=Number(parts[0]), ii=Number(parts[1]);
-      var inv=state.invoices&&state.invoices[iv];
-      var item=inv&&inv.items&&inv.items[ii];
-      var model=item&&item.model;
-      var val=sel.value||'0';
-      var wrap=document.createElement('div');
-      wrap.innerHTML='<input type="hidden" id="'+sel.id+'" value="'+val+'"><div class="hint"><b>2단계 판정결과 기준</b><br>'+esc(fixedCandidate(model,Number(val)))+'</div>';
-      sel.replaceWith(wrap);
-    });
-    document.querySelectorAll('[id^="pn-russia-parties-"]').forEach(function(box){
-      var iv=box.id.replace('pn-russia-parties-','');
-      var hint=box.querySelector('.hint');
-      if(hint) hint.textContent='SERC/SRR 선택 후 아래 버튼을 누르면 구매자, 최종수하인, 최종사용자에 모두 반영됩니다.';
-      if(!box.querySelector('[data-fill-russia-party]')){
-        var btn=document.createElement('button');
-        btn.type='button';
-        btn.className='btn sm';
-        btn.setAttribute('data-fill-russia-party',iv);
-        btn.textContent='구매자·최종수하인·최종사용자 자동 입력';
-        btn.onclick=function(){fillRussiaParties(iv);};
-        box.appendChild(btn);
-      }
-    });
-    document.querySelectorAll('[data-russia-party]').forEach(function(ch){
-      if(ch.dataset.fillAllBound) return;
-      ch.dataset.fillAllBound='1';
-      ch.addEventListener('change',function(){fillRussiaParties(ch.dataset.russiaParty);});
-    });
-  }
-
-  var oldRenderInvoices=window.renderInvoices;
-  if(typeof oldRenderInvoices==='function'&&!oldRenderInvoices.__prenotifEnhanceV1){
-    var wrappedRenderInvoices=function(){
-      oldRenderInvoices.apply(this,arguments);
-      enhancePrenotif();
-    };
-    wrappedRenderInvoices.__prenotifEnhanceV1=true;
-    window.renderInvoices=wrappedRenderInvoices;
-  }
-
-  var oldBuildException=window.buildException;
-  if(typeof oldBuildException==='function'&&!oldBuildException.__noneNoticeV1){
-    var wrappedBuildException=function(){
-      oldBuildException.apply(this,arguments);
-      var btn=document.getElementById('ex-continue');
-      if(btn&&!btn.dataset.noneNoticeV1){
-        var oldClick=btn.onclick;
-        btn.dataset.noneNoticeV1='1';
-        btn.onclick=function(){
-          if(oldClick) oldClick.call(this);
-          var checked=document.querySelector('input[name="ex"]:checked');
-          if(checked&&checked.value==='none'){
-            var el=document.getElementById('ex-result');
-            if(el) el.innerHTML=note('danger','<b>허가예외 해당 없음</b><br>상황허가 대상입니다. 결과 요약 버튼을 눌러 점검 결과를 다운로드 하신 후 통상그룹 담당자에게 전달하여 주시기 바랍니다.');
-            var summary=document.getElementById('ex-summary');
-            if(summary){summary.classList.remove('ghost');summary.classList.add('final-summary');summary.textContent='결과 요약으로 이동';}
-          }
-        };
-      }
-    };
-    wrappedBuildException.__noneNoticeV1=true;
-    window.buildException=wrappedBuildException;
-  }
-
-  installSummaryCleanup();
-})();
-</script>
-'''
-          if marker not in s:
-              head,sep,tail=s.rpartition('</body>')
-              s=head+script+'\n'+sep+tail
-              p.write_text(s,encoding='utf-8')
+          if 'ux-patch-marker-test' not in s:
+            s=s.replace('</body>','<!-- ux-patch-marker-test -->\n</body>',1)
+            p.write_text(s,encoding='utf-8')
           PY
       - name: Commit patch
         run: |
@@ -168,5 +30,5 @@ jobs:
           git config user.name github-actions
           git config user.email github-actions@github.com
           git add index.html
-          git commit -m "Update summary exception and prenotification UX"
+          git commit -m "Test UX patch workflow"
           git push
