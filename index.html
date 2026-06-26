@@ -65,41 +65,9 @@ function modelOptions(selected){return state.preModels.map(m=>`<option value="${
 function money(n){return (Number(n)||0).toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2})}function buildSummary(){save();$('#summary-body').innerHTML=note('warn',`<b>본 결과 요약을 다운로드 후 품의에 첨부해주시기 바랍니다.</b><br>결과 요약이 준비되었습니다. 생성일: ${today()} · 모델 ${state.models.length}개`)}function reportHTML(){const parts=[];parts.push(`<h1>상황허가 판정 · 사전신고 점검 결과 요약</h1><p>작성일: ${today()}</p>`);parts.push(`<h2>1. 모델별 판정 결과</h2>`);state.lookups.forEach(L=>{const status=!L.found?'판정정보 없음':L.expired?'만료 · 재판정 필요':L.isHae?'유효 · 해당 · 허가예외 확인 대상':'유효 · 비해당 · 의심징후 점검 대상';parts.push(`<h3>${esc(L.model)} — ${esc(status)}</h3>${L.found?`<table><tr><th>제품명</th><td>${esc(L.item||'-')}</td><th>HS</th><td>${esc(L.hs||'-')}</td></tr><tr><th>판정결과</th><td>${esc(L.result||'-')}</td><th>판정번호</th><td>${esc(L.number||'-')}</td></tr><tr><th>유효기한</th><td>${esc(L.expiry||'-')}</td><th>판정구분</th><td>${esc(L.type||'-')}</td></tr></table>`:''}`)});if(state.classifyDoc){parts.push(`<h2>2. 판정 신청 품의</h2><h3>제목</h3><pre>${esc(state.classifyDoc.title)}</pre><h3>품목 정보</h3>${classifyTable(state.classifyDoc.items)}<h3>본문</h3>${state.classifyDoc.bodyHtml}`)}if(exceptionTargets().length||state.exceptionChoice){const opt=selectedException();parts.push(`<h2>3. 허가예외 확인</h2>${opt?`<table><tr><th>선택 결과</th><td>${esc(opt.title)}</td></tr><tr><th>내용</th><td>${esc(opt.desc)}</td></tr></table>${opt.id==='none'?'<p><b>상황허가를 받아야 하므로 통상그룹으로 연락 필요</b></p>':'<p>선택한 허가예외 기준으로 사전신고 진행</p>'}`:'<p>허가예외 선택 전</p>'}`)}if(state.preDone){parts.push(`<h2>4. 사전신고</h2>`);state.invoices.forEach(inv=>{let sum=0;parts.push(`<h3>인보이스 ${esc(inv.no)}</h3><table><tr><th>목적국</th><td>${esc(inv.country)}</td><th>구매자</th><td>${esc(inv.buyer)}</td></tr><tr><th>최종수하인</th><td>${esc(inv.consignee||'-')}</td><th>최종사용자</th><td>${esc(inv.endUser)}</td></tr><tr><th>최종사용용도</th><td colspan="3">${esc(inv.endUse)}</td></tr></table><table><tr><th>모델</th><th>제품명</th><th>판정번호</th><th>수량</th><th>단가</th><th>총액</th><th>유무상</th></tr>${inv.items.map(it=>{const c=candidates(it.model)[it.candIdx]||{};const total=(+it.qty||0)*(+it.price||0);sum+=total;return `<tr><td>${esc(it.model)}</td><td>${esc(c.item||'-')}</td><td>${esc(c.number||'-')}</td><td>${esc(it.qty)}</td><td>${money(it.price)}</td><td>${money(total)}</td><td>${esc(it.paid)}</td></tr>`}).join('')}</table><p><b>합계 USD ${money(sum)}</b></p>`)})}if(state.screened){parts.push(`<h2>5. 의심징후 점검</h2><table><tr><th>최종사용자</th><td>${esc(state.enduser.name)}</td><th>수입국</th><td>${esc(state.enduser.country||'-')}</td></tr><tr><th>사업 분야</th><td colspan="3">${esc(state.enduser.business||'-')}</td></tr></table><ul>${currentIndicators().map((o,i)=>`<li>${state.indicators[i]?'[해당]':'[비해당]'} ${esc(o.no+'. '+o.text)}</li>`).join('')}</ul>`)}return `<!doctype html><html lang="ko"><head><meta charset="utf-8"><title>상황허가 점검 결과 요약</title><style>body{font-family:Arial,'Malgun Gothic',sans-serif;color:#15243d;padding:28px;line-height:1.6}h1{font-size:24px}h2{font-size:18px;margin-top:28px;border-bottom:2px solid #9a6a32;padding-bottom:6px}table{width:100%;border-collapse:collapse;margin:8px 0 12px}th,td{border:1px solid #c9c1b0;padding:7px 9px;text-align:left;vertical-align:top}th{background:#f0eadf}pre{white-space:pre-wrap;background:#faf8f2;border:1px solid #d9d2c2;padding:12px;border-radius:8px}</style></head><body>${parts.join('\n')}
 
 
-<script>
-/* classify-skip-summary-v1 */
-(function(){
-  function onlyRussiaSercSrrClassify(){
-    var d = window.state && state.classifyDoc;
-    if(!d) return false;
-    var countries = (d.countries || []).map(function(x){ return String(x||'').trim(); }).filter(Boolean);
-    var parties = (d.importers || []).flatMap(function(x){ return String(x||'').split(/[\n,;/]+/); }).map(function(x){ return String(x||'').trim().toUpperCase(); }).filter(Boolean);
-    if(!(countries.length === 1 && countries[0] === '러시아')) return false;
-    if(!parties.length) return false;
-    return parties.every(function(x){ return x === 'SERC' || x === 'SRR'; });
-  }
-  var originalRenderClassifyDoc = window.renderClassifyDoc;
-  if(typeof originalRenderClassifyDoc === 'function' && !originalRenderClassifyDoc.__skipSummaryWrapped){
-    var wrapped = function(){
-      originalRenderClassifyDoc.apply(this, arguments);
-      if(onlyRussiaSercSrrClassify()){
-        var screenBtn = document.getElementById('cl-screen');
-        if(screenBtn) screenBtn.remove();
-        var summaryBtn = document.getElementById('cl-summary');
-        if(summaryBtn) summaryBtn.classList.add('primary');
-        setTimeout(function(){
-          buildSummary();
-          show('#card-summary');
-        }, 0);
-      }
-    };
-    wrapped.__skipSummaryWrapped = true;
-    window.renderClassifyDoc = wrapped;
-  }
-})();
-</script>
-
 </body></html>`}$('#btn-download').onclick=()=>{const blob=new Blob([reportHTML()],{type:'text/html;charset=utf-8'});const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=`catchall-summary-${today()}.html`;document.body.appendChild(a);a.click();setTimeout(()=>{URL.revokeObjectURL(a.href);a.remove()},500)};function snapshot(){return{ts:Date.now(),modelsText:$('#models').value,classify:state.classify,classifyDoc:state.classifyDoc,exceptionChoice:state.exceptionChoice,preModels:state.preModels,invoices:state.invoices,preDone:state.preDone,enduser:state.enduser,indicators:state.indicators,screened:state.screened}}function save(){try{localStorage.setItem('catchall_draft_v7',JSON.stringify(snapshot()));const h=$('#save-hint');if(h)h.textContent='임시저장됨 '+new Date().toLocaleTimeString()}catch(e){}}document.addEventListener('input',()=>setTimeout(save,300),true);(function restore(){try{const raw=localStorage.getItem('catchall_draft_v7');if(!raw)return;const d=JSON.parse(raw);if(!d||Date.now()-d.ts>1000*60*60*24*14)return;$('#models').value=d.modelsText||'';renderModelPreview();state.classify=d.classify||{};state.classifyDoc=d.classifyDoc||null;state.exceptionChoice=d.exceptionChoice||null;state.preModels=d.preModels||[];state.invoices=d.invoices||[];state.preDone=!!d.preDone;state.enduser=d.enduser||state.enduser;state.indicators=d.indicators||[];state.screened=!!d.screened}catch(e){}})();show('#card-input');
 </script>
+
 
 <script>
 /* catchall-live-overrides-v4 */
