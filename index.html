@@ -125,6 +125,40 @@ function money(n){return (Number(n)||0).toLocaleString('en-US',{minimumFractionD
 })();
 </script>
 
+
+<script>
+/* classify-skip-summary-v1 */
+(function(){
+  function onlyRussiaSercSrrClassify(){
+    var d = window.state && state.classifyDoc;
+    if(!d) return false;
+    var countries = (d.countries || []).map(function(x){ return String(x||'').trim(); }).filter(Boolean);
+    var parties = (d.importers || []).flatMap(function(x){ return String(x||'').split(/[\n,;/]+/); }).map(function(x){ return String(x||'').trim().toUpperCase(); }).filter(Boolean);
+    if(!(countries.length === 1 && countries[0] === '러시아')) return false;
+    if(!parties.length) return false;
+    return parties.every(function(x){ return x === 'SERC' || x === 'SRR'; });
+  }
+  var originalRenderClassifyDoc = window.renderClassifyDoc;
+  if(typeof originalRenderClassifyDoc === 'function' && !originalRenderClassifyDoc.__skipSummaryWrapped){
+    var wrapped = function(){
+      originalRenderClassifyDoc.apply(this, arguments);
+      if(onlyRussiaSercSrrClassify()){
+        var screenBtn = document.getElementById('cl-screen');
+        if(screenBtn) screenBtn.remove();
+        var summaryBtn = document.getElementById('cl-summary');
+        if(summaryBtn) summaryBtn.classList.add('primary');
+        setTimeout(function(){
+          buildSummary();
+          show('#card-summary');
+        }, 0);
+      }
+    };
+    wrapped.__skipSummaryWrapped = true;
+    window.renderClassifyDoc = wrapped;
+  }
+})();
+</script>
+
 </body></html>`}$('#btn-download').onclick=()=>{const blob=new Blob([reportHTML()],{type:'text/html;charset=utf-8'});const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=`catchall-summary-${today()}.html`;document.body.appendChild(a);a.click();setTimeout(()=>{URL.revokeObjectURL(a.href);a.remove()},500)};function snapshot(){return{ts:Date.now(),modelsText:$('#models').value,classify:state.classify,classifyDoc:state.classifyDoc,exceptionChoice:state.exceptionChoice,preModels:state.preModels,invoices:state.invoices,preDone:state.preDone,enduser:state.enduser,indicators:state.indicators,screened:state.screened}}function save(){try{localStorage.setItem('catchall_draft_v7',JSON.stringify(snapshot()));const h=$('#save-hint');if(h)h.textContent='임시저장됨 '+new Date().toLocaleTimeString()}catch(e){}}document.addEventListener('input',()=>setTimeout(save,300),true);(function restore(){try{const raw=localStorage.getItem('catchall_draft_v7');if(!raw)return;const d=JSON.parse(raw);if(!d||Date.now()-d.ts>1000*60*60*24*14)return;$('#models').value=d.modelsText||'';renderModelPreview();state.classify=d.classify||{};state.classifyDoc=d.classifyDoc||null;state.exceptionChoice=d.exceptionChoice||null;state.preModels=d.preModels||[];state.invoices=d.invoices||[];state.preDone=!!d.preDone;state.enduser=d.enduser||state.enduser;state.indicators=d.indicators||[];state.screened=!!d.screened}catch(e){}})();show('#card-input');
 </script>
 </body>
