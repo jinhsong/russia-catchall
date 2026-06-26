@@ -1,4 +1,4 @@
-name: Patch summary exception prenotification
+name: Patch prenotification single party layout
 
 on:
   workflow_dispatch:
@@ -14,21 +14,61 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - name: Install encoded UX override
+      - name: Install single party layout override
         run: |
           python - <<'PY'
           from pathlib import Path
           import re, base64
           p=Path('index.html')
           s=p.read_text(encoding='utf-8')
-          s=s.replace('<!-- ux-final-body-test -->\n','')
-          s=re.sub(r'\n?<script>\s*/\* summary-exception-prenotif-v[0-9]+ \*/[\s\S]*?</script>\n?','',s)
-          payload='CjxzY3JpcHQ+Ci8qIHN1bW1hcnktZXhjZXB0aW9uLXByZW5vdGlmLXYzICovCihmdW5jdGlvbigpewogIGZ1bmN0aW9uIGZpeGVkQ2FuZGlkYXRlKG1vZGVsLCBpZHgpewogICAgdmFyIGNzPSh0eXBlb2YgY2FuZGlkYXRlcz09PSdmdW5jdGlvbic/Y2FuZGlkYXRlcyhtb2RlbCk6W10pfHxbXTsKICAgIHZhciBjPWNzW2lkeF18fGNzWzBdfHx7fTsKICAgIHJldHVybiAoYy5pdGVtfHxtb2RlbHx8Jy0nKSsnIC8gSFMgJysoYy5oc3x8Jy0nKSsnIC8gJysoYy5zb3VyY2V8fCftjJDsoJXqsrDqs7wnKTsKICB9CiAgZnVuY3Rpb24gZmlsbFJ1c3NpYVBhcnRpZXMoaXYpewogICAgdmFyIHZhbHM9QXJyYXkuZnJvbShkb2N1bWVudC5xdWVyeVNlbGVjdG9yQWxsKCdbZGF0YS1ydXNzaWEtcGFydHk9IicraXYrJyJdJykpLmZpbHRlcihmdW5jdGlvbih4KXtyZXR1cm4geC5jaGVja2VkO30pLm1hcChmdW5jdGlvbih4KXtyZXR1cm4geC52YWx1ZTt9KTsKICAgIGlmKCF2YWxzLmxlbmd0aCkgcmV0dXJuOwogICAgdmFyIHY9dmFscy5qb2luKCcsICcpOwogICAgWydidXllcicsJ2NvbnNpZ25lZScsJ2VuZHVzZXInXS5mb3JFYWNoKGZ1bmN0aW9uKGspe3ZhciBlbD1kb2N1bWVudC5nZXRFbGVtZW50QnlJZCgncG4tJytrKyctJytpdik7aWYoZWwpZWwudmFsdWU9djt9KTsKICAgIGlmKHdpbmRvdy5zdGF0ZSYmc3RhdGUuaW52b2ljZXMmJnN0YXRlLmludm9pY2VzW2l2XSl7c3RhdGUuaW52b2ljZXNbaXZdLmJ1eWVyPXY7c3RhdGUuaW52b2ljZXNbaXZdLmNvbnNpZ25lZT12O3N0YXRlLmludm9pY2VzW2l2XS5lbmRVc2VyPXY7c3RhdGUuaW52b2ljZXNbaXZdLnJ1c3NpYVBhcnRpZXM9dmFscztzYXZlKCk7fQogIH0KICBmdW5jdGlvbiBlbmhhbmNlUHJlbm90aWYoKXsKICAgIGRvY3VtZW50LnF1ZXJ5U2VsZWN0b3JBbGwoJyNwbi1pbnZvaWNlcyB0YWJsZS5ncmlkJykuZm9yRWFjaChmdW5jdGlvbih0Ymwpe3ZhciB0aD10YmwucXVlcnlTZWxlY3RvcigndHIgdGg6bnRoLWNoaWxkKDIpJyk7aWYodGgpdGgudGV4dENvbnRlbnQ9J+2ZleyglSDtkojrqqknO30pOwogICAgZG9jdW1lbnQucXVlcnlTZWxlY3RvckFsbCgnW2lkXj0icG4tY2FuZC0iXScpLmZvckVhY2goZnVuY3Rpb24oc2VsKXsKICAgICAgaWYoc2VsLnRhZ05hbWUhPT0nU0VMRUNUJykgcmV0dXJuOwogICAgICB2YXIgcGFydHM9c2VsLmlkLnJlcGxhY2UoJ3BuLWNhbmQtJywnJykuc3BsaXQoJy0nKTsKICAgICAgdmFyIGl2PU51bWJlcihwYXJ0c1swXSksIGlpPU51bWJlcihwYXJ0c1sxXSk7CiAgICAgIHZhciBpbnY9c3RhdGUuaW52b2ljZXMmJnN0YXRlLmludm9pY2VzW2l2XTsKICAgICAgdmFyIGl0ZW09aW52JiZpbnYuaXRlbXMmJmludi5pdGVtc1tpaV07CiAgICAgIHZhciB2YWw9c2VsLnZhbHVlfHwnMCc7CiAgICAgIHZhciBib3g9ZG9jdW1lbnQuY3JlYXRlRWxlbWVudCgnZGl2Jyk7CiAgICAgIGJveC5pbm5lckhUTUw9JzxpbnB1dCB0eXBlPSJoaWRkZW4iIGlkPSInK3NlbC5pZCsnIiB2YWx1ZT0iJyt2YWwrJyI+PGRpdiBjbGFzcz0iaGludCI+PGI+MuuLqOqzhCDtjJDsoJXqsrDqs7wg6riw7KSAPC9iPjxicj4nK2VzYyhmaXhlZENhbmRpZGF0ZShpdGVtJiZpdGVtLm1vZGVsLE51bWJlcih2YWwpKSkrJzwvZGl2Pic7CiAgICAgIHNlbC5yZXBsYWNlV2l0aChib3gpOwogICAgfSk7CiAgICBkb2N1bWVudC5xdWVyeVNlbGVjdG9yQWxsKCdbaWRePSJwbi1ydXNzaWEtcGFydGllcy0iXScpLmZvckVhY2goZnVuY3Rpb24oYm94KXsKICAgICAgdmFyIGl2PWJveC5pZC5yZXBsYWNlKCdwbi1ydXNzaWEtcGFydGllcy0nLCcnKTsKICAgICAgdmFyIGhpbnQ9Ym94LnF1ZXJ5U2VsZWN0b3IoJy5oaW50Jyk7CiAgICAgIGlmKGhpbnQpaGludC50ZXh0Q29udGVudD0nU0VSQy9TUlIg7ISg7YOdIO2bhCDslYTrnpgg67KE7Yq87J2EIOuIhOultOuptCDqtazrp6TsnpAsIOy1nOyiheyImO2VmOyduCwg7LWc7KKF7IKs7Jqp7J6Q7JeQIOuqqOuRkCDrsJjsmIHrkKnri4jri6QuJzsKICAgICAgaWYoIWJveC5xdWVyeVNlbGVjdG9yKCdbZGF0YS1maWxsLXJ1c3NpYS1wYXJ0eV0nKSl7CiAgICAgICAgdmFyIGJ0bj1kb2N1bWVudC5jcmVhdGVFbGVtZW50KCdidXR0b24nKTsKICAgICAgICBidG4udHlwZT0nYnV0dG9uJzsKICAgICAgICBidG4uY2xhc3NOYW1lPSdidG4gc20nOwogICAgICAgIGJ0bi5zZXRBdHRyaWJ1dGUoJ2RhdGEtZmlsbC1ydXNzaWEtcGFydHknLGl2KTsKICAgICAgICBidG4udGV4dENvbnRlbnQ9J+q1rOunpOyekMK37LWc7KKF7IiY7ZWY7J24wrfstZzsooXsgqzsmqnsnpAg7J6Q64+ZIOyeheugpSc7CiAgICAgICAgYnRuLm9uY2xpY2s9ZnVuY3Rpb24oKXtmaWxsUnVzc2lhUGFydGllcyhpdik7fTsKICAgICAgICBib3guYXBwZW5kQ2hpbGQoYnRuKTsKICAgICAgfQogICAgfSk7CiAgICBkb2N1bWVudC5xdWVyeVNlbGVjdG9yQWxsKCdbZGF0YS1ydXNzaWEtcGFydHldJykuZm9yRWFjaChmdW5jdGlvbihjaCl7CiAgICAgIGlmKGNoLmRhdGFzZXQuZmlsbEFsbEJvdW5kKSByZXR1cm47CiAgICAgIGNoLmRhdGFzZXQuZmlsbEFsbEJvdW5kPScxJzsKICAgICAgY2guYWRkRXZlbnRMaXN0ZW5lcignY2hhbmdlJyxmdW5jdGlvbigpe2ZpbGxSdXNzaWFQYXJ0aWVzKGNoLmRhdGFzZXQucnVzc2lhUGFydHkpO30pOwogICAgfSk7CiAgfQogIHZhciBvbGRSZW5kZXJJbnZvaWNlcz13aW5kb3cucmVuZGVySW52b2ljZXM7CiAgaWYodHlwZW9mIG9sZFJlbmRlckludm9pY2VzPT09J2Z1bmN0aW9uJyYmIW9sZFJlbmRlckludm9pY2VzLl9fc3VtbWFyeUV4Y2VwdGlvblByZW5vdGlmVjMpewogICAgdmFyIG5ld1JlbmRlckludm9pY2VzPWZ1bmN0aW9uKCl7b2xkUmVuZGVySW52b2ljZXMuYXBwbHkodGhpcyxhcmd1bWVudHMpO2VuaGFuY2VQcmVub3RpZigpO307CiAgICBuZXdSZW5kZXJJbnZvaWNlcy5fX3N1bW1hcnlFeGNlcHRpb25QcmVub3RpZlYzPXRydWU7CiAgICB3aW5kb3cucmVuZGVySW52b2ljZXM9bmV3UmVuZGVySW52b2ljZXM7CiAgfQogIHZhciBvbGRCdWlsZEV4Y2VwdGlvbj13aW5kb3cuYnVpbGRFeGNlcHRpb247CiAgaWYodHlwZW9mIG9sZEJ1aWxkRXhjZXB0aW9uPT09J2Z1bmN0aW9uJyYmIW9sZEJ1aWxkRXhjZXB0aW9uLl9fbm9uZU5vdGljZVYzKXsKICAgIHZhciBuZXdCdWlsZEV4Y2VwdGlvbj1mdW5jdGlvbigpewogICAgICBvbGRCdWlsZEV4Y2VwdGlvbi5hcHBseSh0aGlzLGFyZ3VtZW50cyk7CiAgICAgIHZhciBidG49ZG9jdW1lbnQuZ2V0RWxlbWVudEJ5SWQoJ2V4LWNvbnRpbnVlJyk7CiAgICAgIGlmKGJ0biYmIWJ0bi5kYXRhc2V0Lm5vbmVOb3RpY2VWMyl7CiAgICAgICAgdmFyIG9sZENsaWNrPWJ0bi5vbmNsaWNrOwogICAgICAgIGJ0bi5kYXRhc2V0Lm5vbmVOb3RpY2VWMz0nMSc7CiAgICAgICAgYnRuLm9uY2xpY2s9ZnVuY3Rpb24oKXsKICAgICAgICAgIGlmKG9sZENsaWNrKSBvbGRDbGljay5jYWxsKHRoaXMpOwogICAgICAgICAgdmFyIGNoZWNrZWQ9ZG9jdW1lbnQucXVlcnlTZWxlY3RvcignaW5wdXRbbmFtZT0iZXgiXTpjaGVja2VkJyk7CiAgICAgICAgICBpZihjaGVja2VkJiZjaGVja2VkLnZhbHVlPT09J25vbmUnKXsKICAgICAgICAgICAgdmFyIGVsPWRvY3VtZW50LmdldEVsZW1lbnRCeUlkKCdleC1yZXN1bHQnKTsKICAgICAgICAgICAgaWYoZWwpIGVsLmlubmVySFRNTD1ub3RlKCdkYW5nZXInLCc8Yj7tl4jqsIDsmIjsmbgg7ZW064u5IOyXhuydjDwvYj48YnI+7IOB7Zmp7ZeI6rCAIOuMgOyDgeyeheuLiOuLpC4g6rKw6rO8IOyalOyVvSDrsoTtirzsnYQg64iM65+sIOygkOqygCDqsrDqs7zrpbwg64uk7Jq066Gc65OcIO2VmOyLoCDtm4Qg7Ya17IOB6re466O5IOuLtOuLueyekOyXkOqyjCDsoITri6ztlZjsl6wg7KO87Iuc6riwIOuwlOuejeuLiOuLpC4nKTsKICAgICAgICAgICAgdmFyIHN1bW1hcnk9ZG9jdW1lbnQuZ2V0RWxlbWVudEJ5SWQoJ2V4LXN1bW1hcnknKTsKICAgICAgICAgICAgaWYoc3VtbWFyeSl7c3VtbWFyeS5jbGFzc0xpc3QucmVtb3ZlKCdnaG9zdCcpO3N1bW1hcnkuY2xhc3NMaXN0LmFkZCgnZmluYWwtc3VtbWFyeScpO3N1bW1hcnkudGV4dENvbnRlbnQ9J+qysOqzvCDsmpTslb3snLzroZwg7J2064+ZJzt9CiAgICAgICAgICB9CiAgICAgICAgfTsKICAgICAgfQogICAgfTsKICAgIG5ld0J1aWxkRXhjZXB0aW9uLl9fbm9uZU5vdGljZVYzPXRydWU7CiAgICB3aW5kb3cuYnVpbGRFeGNlcHRpb249bmV3QnVpbGRFeGNlcHRpb247CiAgfQogIHZhciBvbGRSZXBvcnRIVE1MPXdpbmRvdy5yZXBvcnRIVE1MOwogIGlmKHR5cGVvZiBvbGRSZXBvcnRIVE1MPT09J2Z1bmN0aW9uJyYmIW9sZFJlcG9ydEhUTUwuX19zdW1tYXJ5Q2xlYW51cFYzKXsKICAgIHZhciBuZXdSZXBvcnRIVE1MPWZ1bmN0aW9uKCl7CiAgICAgIHZhciBodG1sPW9sZFJlcG9ydEhUTUwuYXBwbHkodGhpcyxhcmd1bWVudHMpOwogICAgICB0cnl7CiAgICAgICAgdmFyIGRvYz1uZXcgRE9NUGFyc2VyKCkucGFyc2VGcm9tU3RyaW5nKGh0bWwsJ3RleHQvaHRtbCcpOwogICAgICAgIGRvYy5xdWVyeVNlbGVjdG9yQWxsKCdoMixoMyxoNCcpLmZvckVhY2goZnVuY3Rpb24oaCl7CiAgICAgICAgICBpZigv7LWc7KKF7IKs7Jqp7J6QIOygleuztHzsgqzsl4Ug67aE7JW8fO2ZnOyaqSDrtoTslbwvLnRlc3QoaC50ZXh0Q29udGVudHx8JycpKXsKICAgICAgICAgICAgdmFyIG49aC5uZXh0U2libGluZzsKICAgICAgICAgICAgd2hpbGUobil7CiAgICAgICAgICAgICAgdmFyIG5leHQ9bi5uZXh0U2libGluZzsKICAgICAgICAgICAgICBpZihuLm5vZGVUeXBlPT09MSYmL15IWzIzNF0kLy50ZXN0KG4udGFnTmFtZSkpIGJyZWFrOwogICAgICAgICAgICAgIGlmKG4ucGFyZW50Tm9kZSkgbi5wYXJlbnROb2RlLnJlbW92ZUNoaWxkKG4pOwogICAgICAgICAgICAgIG49bmV4dDsKICAgICAgICAgICAgfQogICAgICAgICAgICBoLnJlbW92ZSgpOwogICAgICAgICAgfQogICAgICAgIH0pOwogICAgICAgIGRvYy5xdWVyeVNlbGVjdG9yQWxsKCd0cicpLmZvckVhY2goZnVuY3Rpb24odHIpe2lmKC/sgqzsl4Ug67aE7JW8fO2ZnOyaqSDrtoTslbwvLnRlc3QodHIudGV4dENvbnRlbnR8fCcnKSl0ci5yZW1vdmUoKTt9KTsKICAgICAgICByZXR1cm4gJzwhZG9jdHlwZSBodG1sPlxuJytkb2MuZG9jdW1lbnRFbGVtZW50Lm91dGVySFRNTDsKICAgICAgfWNhdGNoKGUpewogICAgICAgIHJldHVybiBodG1sLnJlcGxhY2UoLzxoWzIzNF1bXj5dKj5bXjxdKijstZzsooXsgqzsmqnsnpAg7KCV67O0fOyCrOyXhSDrtoTslbx87Zmc7JqpIOu2hOyVvClbXHNcU10qPyg/PTxoWzIzNF18PFwvYm9keT4pL2csJycpOwogICAgICB9CiAgICB9OwogICAgbmV3UmVwb3J0SFRNTC5fX3N1bW1hcnlDbGVhbnVwVjM9dHJ1ZTsKICAgIHdpbmRvdy5yZXBvcnRIVE1MPW5ld1JlcG9ydEhUTUw7CiAgfQp9KSgpOwo8L3NjcmlwdD4K'
+          s=re.sub(r'\n?<script>\s*/\* prenotif-single-party-layout-v[0-9]+ \*/[\s\S]*?</script>\n?','',s)
+          payload='CjxzY3JpcHQ+Ci8qIHByZW5vdGlmLXNpbmdsZS1wYXJ0eS1sYXlvdXQtdjEgKi8KKGZ1bmN0aW9uKCl7CiAgZnVuY3Rpb24gc2V0UGFydHlWYWx1ZShpdiwgdmFsKXsKICAgIFsnYnV5ZXInLCdjb25zaWduZWUnLCdlbmR1c2VyJ10uZm9yRWFjaChmdW5jdGlvbihrKXsKICAgICAgdmFyIGVsPWRvY3VtZW50LmdldEVsZW1lbnRCeUlkKCdwbi0nK2srJy0nK2l2KTsKICAgICAgaWYoZWwpIGVsLnZhbHVlPXZhbDsKICAgIH0pOwogICAgaWYod2luZG93LnN0YXRlJiZzdGF0ZS5pbnZvaWNlcyYmc3RhdGUuaW52b2ljZXNbaXZdKXsKICAgICAgc3RhdGUuaW52b2ljZXNbaXZdLmJ1eWVyPXZhbDsKICAgICAgc3RhdGUuaW52b2ljZXNbaXZdLmNvbnNpZ25lZT12YWw7CiAgICAgIHN0YXRlLmludm9pY2VzW2l2XS5lbmRVc2VyPXZhbDsKICAgICAgc3RhdGUuaW52b2ljZXNbaXZdLnJ1c3NpYVBhcnRpZXM9dmFsP1t2YWxdOltdOwogICAgICBzYXZlKCk7CiAgICB9CiAgfQogIGZ1bmN0aW9uIGVuZm9yY2VTaW5nbGVQYXJ0eShpdiwgc2VsZWN0ZWQpewogICAgdmFyIGNoZWNrcz1BcnJheS5mcm9tKGRvY3VtZW50LnF1ZXJ5U2VsZWN0b3JBbGwoJ1tkYXRhLXJ1c3NpYS1wYXJ0eT0iJytpdisnIl0nKSk7CiAgICBpZihzZWxlY3RlZCl7CiAgICAgIGNoZWNrcy5mb3JFYWNoKGZ1bmN0aW9uKHgpeyBpZih4LnZhbHVlIT09c2VsZWN0ZWQpIHguY2hlY2tlZD1mYWxzZTsgeC5jbG9zZXN0KCcuY2hrJykmJnguY2xvc2VzdCgnLmNoaycpLmNsYXNzTGlzdC50b2dnbGUoJ29uJyx4LmNoZWNrZWQpOyB9KTsKICAgICAgc2V0UGFydHlWYWx1ZShpdiwgc2VsZWN0ZWQpOwogICAgfWVsc2V7CiAgICAgIHZhciBjaGVja2VkPWNoZWNrcy5maWx0ZXIoZnVuY3Rpb24oeCl7cmV0dXJuIHguY2hlY2tlZDt9KTsKICAgICAgaWYoY2hlY2tlZC5sZW5ndGg+MSl7CiAgICAgICAgY2hlY2tlZC5zbGljZSgxKS5mb3JFYWNoKGZ1bmN0aW9uKHgpe3guY2hlY2tlZD1mYWxzZTt9KTsKICAgICAgfQogICAgICB2YXIgdmFsPShjaGVja3MuZmluZChmdW5jdGlvbih4KXtyZXR1cm4geC5jaGVja2VkO30pfHx7fSkudmFsdWV8fCcnOwogICAgICBjaGVja3MuZm9yRWFjaChmdW5jdGlvbih4KXt4LmNsb3Nlc3QoJy5jaGsnKSYmeC5jbG9zZXN0KCcuY2hrJykuY2xhc3NMaXN0LnRvZ2dsZSgnb24nLHguY2hlY2tlZCk7fSk7CiAgICAgIGlmKHZhbCkgc2V0UGFydHlWYWx1ZShpdiwgdmFsKTsKICAgIH0KICB9CiAgZnVuY3Rpb24gYXBwbHlQcmVub3RpZlNpbmdsZVBhcnR5TGF5b3V0KCl7CiAgICBkb2N1bWVudC5xdWVyeVNlbGVjdG9yQWxsKCdbZGF0YS1maWxsLXJ1c3NpYS1wYXJ0eV0nKS5mb3JFYWNoKGZ1bmN0aW9uKGJ0bil7YnRuLnJlbW92ZSgpO30pOwogICAgZG9jdW1lbnQucXVlcnlTZWxlY3RvckFsbCgnW2lkXj0icG4tcnVzc2lhLXBhcnRpZXMtIl0nKS5mb3JFYWNoKGZ1bmN0aW9uKGJveCl7CiAgICAgIHZhciBpdj1ib3guaWQucmVwbGFjZSgncG4tcnVzc2lhLXBhcnRpZXMtJywnJyk7CiAgICAgIHZhciBoaW50PWJveC5xdWVyeVNlbGVjdG9yKCcuaGludCcpOwogICAgICBpZihoaW50KSBoaW50LnRleHRDb250ZW50PSdTRVJDIOuYkOuKlCBTUlIg7KSRIO2VmOuCmOu만CDshKDtg50할 수 있습니다. 선택 시 구매자, 최종수하인, 최종사용자에 자동 반영됩니다.';
+      enforceSingleParty(iv);
+    });
+    document.querySelectorAll('[data-russia-party]').forEach(function(ch){
+      if(ch.dataset.singlePartyBound) return;
+      ch.dataset.singlePartyBound='1';
+      ch.addEventListener('change',function(){
+        var iv=ch.dataset.russiaParty;
+        if(ch.checked) enforceSingleParty(iv, ch.value);
+        else enforceSingleParty(iv);
+      }, true);
+    });
+  }
+  var style=document.getElementById('prenotif-col-width-style');
+  if(!style){
+    style=document.createElement('style');
+    style.id='prenotif-col-width-style';
+    style.textContent=[
+      '@media(min-width:561px){',
+      '#card-prenotif table.grid th:nth-child(1),#card-prenotif table.grid td:nth-child(1){width:30%;min-width:190px}',
+      '#card-prenotif table.grid th:nth-child(2),#card-prenotif table.grid td:nth-child(2){width:30%;min-width:180px}',
+      '#card-prenotif table.grid th:nth-child(3),#card-prenotif table.grid td:nth-child(3){width:9%;min-width:80px}',
+      '#card-prenotif table.grid th:nth-child(4),#card-prenotif table.grid td:nth-child(4){width:11%;min-width:95px}',
+      '#card-prenotif table.grid th:nth-child(5),#card-prenotif table.grid td:nth-child(5){width:10%;min-width:90px}',
+      '#card-prenotif table.grid th:nth-child(6),#card-prenotif table.grid td:nth-child(6){width:10%;min-width:80px}',
+      '#card-prenotif table.grid td:nth-child(3) input,#card-prenotif table.grid td:nth-child(4) input{padding-left:8px;padding-right:8px}',
+      '}'
+    ].join('');
+    document.head.appendChild(style);
+  }
+  var oldRenderInvoices=window.renderInvoices;
+  if(typeof oldRenderInvoices==='function'&&!oldRenderInvoices.__singlePartyLayoutV1){
+    var newRenderInvoices=function(){
+      oldRenderInvoices.apply(this,arguments);
+      applyPrenotifSinglePartyLayout();
+    };
+    newRenderInvoices.__singlePartyLayoutV1=true;
+    window.renderInvoices=newRenderInvoices;
+  }
+  applyPrenotifSinglePartyLayout();
+})();
+</script>
+'
           script=base64.b64decode(payload).decode('utf-8')
-          if 'summary-exception-prenotif-v3' not in s:
-              head,sep,tail=s.rpartition('</body>')
-              s=head+script+'\n'+sep+tail
-              p.write_text(s,encoding='utf-8')
+          head,sep,tail=s.rpartition('</body>')
+          s=head+script+'\n'+sep+tail
+          p.write_text(s,encoding='utf-8')
           PY
       - name: Commit patch
         run: |
@@ -36,5 +76,5 @@ jobs:
           git config user.name github-actions
           git config user.email github-actions@github.com
           git add index.html
-          git commit -m "Update summary exception and prenotification UX"
+          git commit -m "Make prenotification SERC SRR mutually exclusive"
           git push
