@@ -66,70 +66,9 @@ function money(n){return (Number(n)||0).toLocaleString('en-US',{minimumFractionD
 
 
 
-<script>
-/* suspicion-ui-override-v1 */
-(function(){
-  window.currentIndicators=function(){return INDICATORS.map(function(t,i){return {no:String(i+1),text:t};});};
-
-  const classifyBtn=document.getElementById('btn-classify-gen');
-  if(classifyBtn&&!classifyBtn.dataset.belarusGuard){
-    classifyBtn.dataset.belarusGuard='1';
-    classifyBtn.addEventListener('click',function(e){
-      const countries=selectedCountries();
-      const etc=document.getElementById('imp-etc');
-      if(countries.includes('\uBCA8\uB77C\uB8E8\uC2A4')&&etc&&!etc.value.trim()){
-        clearErrors(document.getElementById('card-classify'));
-        addErr(etc,'\uBCA8\uB77C\uB8E8\uC2A4 \uCD5C\uC885\uC0AC\uC6A9\uC790 \uC785\uB825');
-        document.getElementById('classify-doc-out').innerHTML=note('danger','\uC785\uB825\uC744 \uD655\uC778\uD558\uC138\uC694.<ul><li>\uBCA8\uB77C\uB8E8\uC2A4 \uCD5C\uC885\uC0AC\uC6A9\uC790 \uC785\uB825</li></ul>');
-        e.preventDefault();
-        e.stopImmediatePropagation();
-      }
-    },true);
-  }
-
-  window.buildScreen=function(){
-    const items=screenTargets();
-    state.sanctionsHits=[];
-    const eu=document.getElementById('enduser-body');
-    if(eu){
-      eu.innerHTML='';
-      const h=eu.previousElementSibling;
-      const d=h&&h.previousElementSibling;
-      if(h)h.style.display='none';
-      if(d&&d.classList&&d.classList.contains('divider'))d.style.display='none';
-    }
-    const sb=document.getElementById('sanctions-body');
-    sb.innerHTML=items.length?note('info',`\uB300\uC0C1 \uBAA8\uB378: <b>${esc(items.map(x=>x.model).join(', '))}</b>`):note('info','\uC758\uC2EC\uC9D5\uD6C4 \uC810\uAC80 \uB300\uC0C1 \uBAA8\uB378\uC774 \uC5C6\uC2B5\uB2C8\uB2E4.');
-    items.forEach(function(L){
-      const hit=DB.sanctions.find(function(r){return hsMatch(L.hs,F.hs(r));});
-      if(hit)state.sanctionsHits.push({model:L.model,hs:L.hs,desc:F.desc(hit)});
-      sb.insertAdjacentHTML('beforeend',`<div class="mcard"><div class="mhead"><span class="mname">${esc(L.model)}</span>${badge(hit?'danger':'ok',hit?'\uC81C\uC7AC HS \uB9E4\uCE6D':'\uC81C\uC7AC HS \uBBF8\uB9E4\uCE6D')}</div><div class="mbody">${hit?`HS ${esc(L.hs)} · ${esc(F.desc(hit))}`:'\uB300\uB7EC \uC81C\uC7AC\uB300\uC0C1 HS\uC5D0 \uB9E4\uCE6D\uB418\uC9C0 \uC54A\uC558\uC2B5\uB2C8\uB2E4.'}</div></div>`);
-    });
-    const inds=currentIndicators();
-    document.getElementById('indicators-body').innerHTML=inds.map(function(o,i){
-      const yes=!!state.indicators[i];
-      return `<div class="mcard"><div class="mbody"><div class="row" style="align-items:center"><div class="col"><b>#${esc(o.no)}</b> ${esc(o.text)}</div><div class="col" style="flex:0 0 190px"><label class="chk ${yes?'on':''}"><input type="radio" name="ind-${i}" value="yes" ${yes?'checked':''}> \uC608</label><label class="chk ${yes?'':'on'}"><input type="radio" name="ind-${i}" value="no" ${yes?'':'checked'}> \uC544\uB2C8\uC624</label></div></div></div></div>`;
-    }).join('');
-    document.querySelectorAll('#indicators-body input[type=radio]').forEach(function(r){
-      r.onchange=function(){document.querySelectorAll(`input[name="${r.name}"]`).forEach(function(x){x.closest('.chk').classList.toggle('on',x.checked);});};
-    });
-  };
-
-  const screenNext=document.getElementById('btn-screen-next');
-  if(screenNext){
-    screenNext.onclick=function(){
-      state.indicators=currentIndicators().map(function(_,i){return document.querySelector(`input[name="ind-${i}"]:checked`)?.value==='yes';});
-      state.screened=true;
-      save();
-      buildSummary();
-      show('#card-summary');
-    };
-  }
-})();
-</script>
-
 </body></html>`}$('#btn-download').onclick=()=>{const blob=new Blob([reportHTML()],{type:'text/html;charset=utf-8'});const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=`catchall-summary-${today()}.html`;document.body.appendChild(a);a.click();setTimeout(()=>{URL.revokeObjectURL(a.href);a.remove()},500)};function snapshot(){return{ts:Date.now(),modelsText:$('#models').value,classify:state.classify,classifyDoc:state.classifyDoc,exceptionChoice:state.exceptionChoice,preModels:state.preModels,invoices:state.invoices,preDone:state.preDone,enduser:state.enduser,indicators:state.indicators,screened:state.screened}}function save(){try{localStorage.setItem('catchall_draft_v7',JSON.stringify(snapshot()));const h=$('#save-hint');if(h)h.textContent='임시저장됨 '+new Date().toLocaleTimeString()}catch(e){}}document.addEventListener('input',()=>setTimeout(save,300),true);(function restore(){try{const raw=localStorage.getItem('catchall_draft_v7');if(!raw)return;const d=JSON.parse(raw);if(!d||Date.now()-d.ts>1000*60*60*24*14)return;$('#models').value=d.modelsText||'';renderModelPreview();state.classify=d.classify||{};state.classifyDoc=d.classifyDoc||null;state.exceptionChoice=d.exceptionChoice||null;state.preModels=d.preModels||[];state.invoices=d.invoices||[];state.preDone=!!d.preDone;state.enduser=d.enduser||state.enduser;state.indicators=d.indicators||[];state.screened=!!d.screened}catch(e){}})();show('#card-input');
 </script>
+
 
 
 <script>
