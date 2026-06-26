@@ -14,23 +14,31 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - name: Remove auto jump and style final summary button
+      - name: Keep memo visible and style summary button
         run: |
           python - <<'PY'
           from pathlib import Path
-          import re
           p=Path('index.html')
           s=p.read_text(encoding='utf-8')
-          original=s
+          old="""        var summaryBtn=document.getElementById('cl-summary');
+        if(summaryBtn)summaryBtn.classList.add('primary');
+        setTimeout(function(){
+          buildSummary();
+          show('#card-summary');
+        },0);"""
+          new="""        var summaryBtn=document.getElementById('cl-summary');
+        if(summaryBtn){
+          summaryBtn.classList.remove('ghost');
+          summaryBtn.classList.add('final-summary');
+          summaryBtn.textContent='결과 요약으로 이동';
+          var tb=summaryBtn.closest('.toolbar');
+          if(tb)tb.classList.add('final-stage');
+        }"""
+          s=s.replace(old,new)
           css='''\n.btn.final-summary{background:linear-gradient(135deg,var(--copper),#6f471d);border-color:#6f471d;color:#fff;box-shadow:0 8px 18px rgba(154,106,50,.22);padding:12px 20px;font-size:14px}.btn.final-summary:after{content:" →"}.toolbar.final-stage{border-top:1px solid var(--line);padding-top:14px;margin-top:18px}\n'''
           if '.btn.final-summary' not in s:
-              s=s.replace('</style>',css+'</style>',1)
-          s=re.sub(r"\s*setTimeout\(function\(\)\{\s*buildSummary\(\);\s*show\('#card-summary'\);\s*\},0\);", "", s)
-          s=re.sub(r"\s*setTimeout\(function\(\)\{\s*buildSummary\(\);\s*show\('#card-summary'\);\s*\}, 0\);", "", s)
-          s=s.replace("if(summaryBtn)summaryBtn.classList.add('primary');", "if(summaryBtn){summaryBtn.classList.remove('ghost');summaryBtn.classList.add('final-summary');summaryBtn.textContent='결과 요약으로 이동';var tb=summaryBtn.closest('.toolbar');if(tb)tb.classList.add('final-stage');}")
-          s=s.replace("if(summaryBtn) summaryBtn.classList.add('primary');", "if(summaryBtn){summaryBtn.classList.remove('ghost');summaryBtn.classList.add('final-summary');summaryBtn.textContent='결과 요약으로 이동';var tb=summaryBtn.closest('.toolbar');if(tb)tb.classList.add('final-stage');}")
-          if s!=original:
-              p.write_text(s,encoding='utf-8')
+            s=s.replace('</style>',css+'</style>',1)
+          p.write_text(s,encoding='utf-8')
           PY
       - name: Commit patch
         run: |
@@ -38,5 +46,5 @@ jobs:
           git config user.name github-actions
           git config user.email github-actions@github.com
           git add index.html
-          git commit -m "Keep classification memo visible before summary"
+          git commit -m "Keep memo visible before final summary"
           git push
