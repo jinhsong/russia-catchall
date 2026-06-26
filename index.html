@@ -159,11 +159,7 @@ function money(n){return (Number(n)||0).toLocaleString('en-US',{minimumFractionD
         var screenBtn=document.getElementById('cl-screen');
         if(screenBtn)screenBtn.remove();
         var summaryBtn=document.getElementById('cl-summary');
-        if(summaryBtn)summaryBtn.classList.add('primary');
-        setTimeout(function(){
-          buildSummary();
-          show('#card-summary');
-        },0);
+        if(summaryBtn){summaryBtn.classList.remove('ghost');summaryBtn.classList.add('final-summary');summaryBtn.textContent='결과 요약으로 이동';var tb=summaryBtn.closest('.toolbar');if(tb)tb.classList.add('final-stage');}
       }
     };
     wrapped.__catchallSkipWrappedV4=true;
