@@ -1,0 +1,74 @@
+name: Fix suspicion flow
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - main
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Patch suspicion flow and indicators
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          p = Path('index.html')
+          s = p.read_text(encoding='utf-8')
+          original = s
+
+          s = s.replace('red flag', '의심징후')
+          s = s.replace('Red flag', '의심징후')
+          s = s.replace('RED FLAG', '의심징후')
+
+          start = s.find('const INDICATORS=[')
+          end = s.find('];\nconst PURPOSE_OPTIONS', start)
+          if start == -1 or end == -1:
+              raise SystemExit('INDICATORS block not found')
+          end += 2
+          indicators = """const INDICATORS=['수입자가 해당 물품등의 최종용도에 관하여 필요한 정보 제공을 기피하는 경우','해당 물품등이 최종사용자의 사업 분야에 활용되지 아니하는 경우','해당 물품등이 수입국의 기술수준과 현저한 격차가 있는 경우','최종사용자가 해당 물품등이 활용될 분야의 사업 경력이 없는 경우','최종사용자가 해당 물품등에 대한 전문적 지식이 없으면서도 그 물품등의 수출을 요구하는 경우','최종사용자가 해당 물품등에 대한 설치·보수 또는 교육훈련 서비스를 거부하는 경우','해당 물품등의 최종수하인이 운송업자인 경우','해당 물품등에 대한 가격조건이나 지불조건이 통상적인 범위를 벗어나는 경우','해당 물품등의 납기일이 통상적인 기간을 벗어난 경우','해당 물품등의 수송경로가 통상적인 경로를 벗어난 경우','해당 물품등의 수입국 내 사용 또는 재수출 여부가 명백하지 아니한 경우','해당 물품등에 대한 정보나 목적지 등에 대하여 통상적인 범위를 벗어나는 보안을 요구하는 경우','구매자, 최종수하인 또는 최종사용자가 우려거래자인 경우 - Tcode ZRMDD000940 에서 입력 후 "No Matching List Found" 가 나타나는 경우 아니요 체크','해당 물품등에 관하여 산업통상부 장관 또는 관계행정기관의 장으로부터 대량파괴무기등의 제조, 개발, 사용 또는 보관의 용도로 전용될 우려가 있어 수출허가가 필요하다는 내용의 통보를 받은 사실이 있는 경우'];"""
+          s = s[:start] + indicators + s[end:]
+
+          if 'const GA_REGION_COUNTRIES=' not in s:
+              marker = 'const PURPOSE_OPTIONS='
+              idx = s.find(marker)
+              next_semicolon = s.find(';', idx)
+              ga = "\nconst GA_REGION_COUNTRIES=['아르헨티나','호주','오스트리아','불가리아','벨기에','캐나다','체코','덴마크','핀란드','프랑스','독일','그리스','헝가리','아일랜드','이탈리아','일본','룩셈부르크','네덜란드','뉴질랜드','노르웨이','우크라이나','폴란드','포르투갈','스페인','스웨덴','스위스','터키','영국','미국','괌','북마리아나제도','미국령 버진아일랜드','푸에르토리코'];\nconst GA_REGION_NOTICE='해당 물품등의 구매자, 최종수하인 또는 최종사용자가 그 물품등을 대량파괴무기등의 제조, 개발, 사용 또는 보관 등의 용도로 전용할 의도가 있음을 사전에 인지한 경우';"
+              s = s[:next_semicolon+1] + ga + s[next_semicolon+1:]
+
+          helper = """function partyTokens(v){return String(v||'').split(/[\\n,;/]+/).map(x=>x.trim()).filter(Boolean)}function isSercSrrParty(v){const a=partyTokens(v);return a.length&&a.every(x=>['serc','srr'].includes(x.toLowerCase()))}function needsSuspicionAfterPrenotif(){return state.invoices.some(inv=>[inv.buyer,inv.consignee,inv.endUser].some(v=>!isSercSrrParty(v)))}function countryValues(){const vals=[];try{if(state.classifyDoc&&state.classifyDoc.countries)vals.push(...state.classifyDoc.countries)}catch(e){}try{state.invoices.forEach(inv=>vals.push(inv.country))}catch(e){}try{if(state.enduser&&state.enduser.country)vals.push(state.enduser.country)}catch(e){}try{$$('.ctry',traderRoot()).filter(x=>x.checked).forEach(x=>vals.push(x.value))}catch(e){}return vals.map(x=>String(x||'').trim()).filter(Boolean)}function isGaRegionCountry(v){const s=String(v||'').trim();return GA_REGION_COUNTRIES.some(c=>s===c||s.includes(c))}function hasGaRegionCountry(){return countryValues().some(isGaRegionCountry)}function currentIndicators(){const a=[];if(hasGaRegionCountry())a.push({no:'0',text:GA_REGION_NOTICE});INDICATORS.forEach((t,i)=>a.push({no:String(i+1),text:t}));return a}function screenTargets(){const m=new Map();redflagTargets().forEach(L=>m.set(L.model,L));if(state.classifyDoc&&state.classifyDoc.items)state.classifyDoc.items.forEach(it=>m.set(it.model,{model:it.model,item:it.item,hs:it.hs,found:true,result:'판정 신청 품의 대상'}));try{state.invoices.forEach(inv=>inv.items.forEach(it=>{const c=candidates(it.model)[it.candIdx]||{};m.set(it.model,{model:it.model,item:c.item||it.model,hs:c.hs||'',found:true,result:'사전신고 품목'})}))}catch(e){}return Array.from(m.values())}"""
+          if 'function partyTokens(v)' not in s:
+              s = s.replace('function buildScreen(){', helper + 'function buildScreen(){', 1)
+
+          s = s.replace('const items=redflagTargets();', 'const items=screenTargets();')
+          s = s.replace('state.preDone=true;save();buildSummary();show(\'#card-summary\')', "state.preDone=true;save();if(needsSuspicionAfterPrenotif()){buildScreen();show('#card-screen')}else{buildSummary();show('#card-summary')}")
+          s = s.replace('const e=exceptionTargets(),r=redflagTargets(),btns=[];', 'const e=exceptionTargets(),r=screenTargets(),btns=[];')
+
+          old_indicator = "$('#indicators-body').innerHTML=INDICATORS.map((t,i)=>`<label class=\"radio\"><input type=\"checkbox\" id=\"ind-${i}\" ${state.indicators[i]?'checked':''}><span><b>#${i+1}</b> ${esc(t)}</span></label>`).join('');"
+          new_indicator = "const inds=currentIndicators();$('#indicators-body').innerHTML=inds.map((o,i)=>`<label class=\"radio\"><input type=\"checkbox\" id=\"ind-${i}\" ${state.indicators[i]?'checked':''}><span><b>#${esc(o.no)}</b> ${esc(o.text)}</span></label>`).join('');"
+          s = s.replace(old_indicator, new_indicator)
+
+          s = s.replace('state.indicators=INDICATORS.map((_,i)=>$(\'#ind-\'+i).checked);', "state.indicators=currentIndicators().map((_,i)=>$('#ind-'+i).checked);")
+          old_report = "INDICATORS.map((t,i)=>`<li>${state.indicators[i]?'[해당]':'[비해당]'} ${esc(t)}</li>`).join('')"
+          new_report = "currentIndicators().map((o,i)=>`<li>${state.indicators[i]?'[해당]':'[비해당]'} ${esc(o.no+'. '+o.text)}</li>`).join('')"
+          s = s.replace(old_report, new_report)
+
+          if s != original:
+              p.write_text(s, encoding='utf-8')
+          PY
+      - name: Commit patch
+        run: |
+          if git diff --quiet; then
+            echo "No changes"
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add index.html
+          git commit -m "Update suspicion flow and indicators"
+          git push
