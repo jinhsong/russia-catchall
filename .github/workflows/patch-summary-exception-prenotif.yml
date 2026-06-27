@@ -1,10 +1,100 @@
-name: Patch exact match preview disabled
+name: Patch exception detail
 
 on:
+  push:
+    branches:
+      - exact-match-preview
   workflow_dispatch:
 
+permissions:
+  contents: write
+
 jobs:
-  noop:
+  patch:
     runs-on: ubuntu-latest
     steps:
-      - run: echo done
+      - uses: actions/checkout@v4
+      - name: Add exception detail override
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          import re
+          p=Path('index.html')
+          s=p.read_text(encoding='utf-8')
+          s=re.sub(r'\n?<script>\s*/\* exception-detail-consumer-launch-v[0-9]+ \*/[\s\S]*?</script>\n?','',s)
+          script=r'''
+<script>
+/* exception-detail-consumer-launch-v1 */
+(function(){
+  const DOC_URL='docs/6month_launch_commitment.docx';
+  function exExtra(){if(!state.exceptionExtra)state.exceptionExtra={};return state.exceptionExtra;}
+  function selectedExId(){return document.querySelector('input[name="ex"]:checked')?.value||'';}
+  function renderExceptionDetail(){
+    const id=selectedExId();
+    const old=document.getElementById('ex-extra-detail');
+    if(old) old.remove();
+    const anchor=document.getElementById('ex-result');
+    if(!anchor) return;
+    if(id==='repair'){
+      const saved=exExtra().repairType||'';
+      anchor.insertAdjacentHTML('beforebegin',`<div id="ex-extra-detail" class="note info"><b>세부 허가예외를 선택하세요.</b><div style="margin-top:8px"><label class="radio"><input type="radio" name="ex-repair-type" value="보정, 수리(제26조제1항제15호)" ${saved==='보정, 수리(제26조제1항제15호)'?'checked':''}> <span><b>보정, 수리</b><br><span class="muted small">제26조제1항제15호</span></span></label><label class="radio"><input type="radio" name="ex-repair-type" value="검사, 시험(제26조제1항제16호)" ${saved==='검사, 시험(제26조제1항제16호)'?'checked':''}> <span><b>검사, 시험</b><br><span class="muted small">제26조제1항제16호</span></span></label></div></div>`);
+      document.querySelectorAll('input[name="ex-repair-type"]').forEach(r=>r.onchange=function(){exExtra().repairType=this.value;document.querySelectorAll('input[name="ex-repair-type"]').forEach(x=>x.closest('.radio').classList.toggle('on',x.checked));save();});
+      document.querySelectorAll('input[name="ex-repair-type"]').forEach(x=>x.closest('.radio').classList.toggle('on',x.checked));
+    }
+    if(id==='consumer'){
+      const saved=exExtra().consumerReleased||'';
+      anchor.insertAdjacentHTML('beforebegin',`<div id="ex-extra-detail" class="note info"><b>이미 출시된 제품입니까?</b><div style="margin-top:8px"><label class="radio"><input type="radio" name="ex-consumer-released" value="yes" ${saved==='yes'?'checked':''}> <span><b>예</b><br><span class="muted small">사전신고 시 삼성닷컴 등 오픈마켓에서 판매 중인 화면 캡처를 첨부하세요.</span></span></label><label class="radio"><input type="radio" name="ex-consumer-released" value="no" ${saved==='no'?'checked':''}> <span><b>아니오</b><br><span class="muted small">6개월 이내 출시 확약서가 필요합니다.</span></span></label></div><div id="ex-consumer-guide" style="margin-top:8px"></div></div>`);
+      const guide=()=>{const v=document.querySelector('input[name="ex-consumer-released"]:checked')?.value||'';const g=document.getElementById('ex-consumer-guide');if(!g)return;if(v==='yes')g.innerHTML=note('ok','사전신고 시 <b>삼성닷컴 등 오픈마켓에서 판매 중인 화면 캡처</b>를 첨부해 주세요.');if(v==='no')g.innerHTML=note('warn',`<b>6개월 이내 출시 확약서(산업통상자원부 제출)</b>가 필요합니다.<br><a class="btn sm" href="${DOC_URL}" download>6개월 이내 출시 확약서 다운로드</a><ul><li>본 6개월 이내 출시 확약서에 서명 후 파트장 결재, 통상그룹 통보로 진행해 주세요.</li><li>사전신고 시 본 6개월 이내 출시 확약서와 결재본(eml 파일)을 첨부해야 합니다.</li></ul>`);};
+      document.querySelectorAll('input[name="ex-consumer-released"]').forEach(r=>r.onchange=function(){exExtra().consumerReleased=this.value;document.querySelectorAll('input[name="ex-consumer-released"]').forEach(x=>x.closest('.radio').classList.toggle('on',x.checked));guide();save();});
+      document.querySelectorAll('input[name="ex-consumer-released"]').forEach(x=>x.closest('.radio').classList.toggle('on',x.checked));guide();
+    }
+  }
+  const oldBuildException=window.buildException;
+  if(typeof oldBuildException==='function'&&!oldBuildException.__exceptionDetailConsumerLaunchV1){
+    const wrapped=function(){
+      oldBuildException.apply(this,arguments);
+      document.querySelectorAll('input[name="ex"]').forEach(r=>r.addEventListener('change',()=>{document.getElementById('ex-result').innerHTML='';renderExceptionDetail();}));
+      renderExceptionDetail();
+      const btn=document.getElementById('ex-continue');
+      if(btn){
+        btn.onclick=function(){
+          const checked=document.querySelector('input[name="ex"]:checked');
+          if(!checked){alert('허가예외를 선택하세요.');return}
+          const opt=EXCEPTION_OPTIONS.find(o=>o.id===checked.value);
+          const extra=exExtra();
+          if(opt.id==='repair'&&!extra.repairType){alert('보정·수리 또는 검사·시험 중 하나를 선택하세요.');return}
+          if(opt.id==='consumer'&&!extra.consumerReleased){alert('이미 출시된 제품인지 여부를 선택하세요.');return}
+          let choice={...opt};
+          if(opt.id==='repair')choice.title=extra.repairType;
+          if(opt.id==='consumer')choice.consumerReleased=extra.consumerReleased;
+          state.exceptionChoice=choice;
+          save();
+          if(opt.id==='none'){
+            document.getElementById('ex-result').innerHTML=note('danger','<b>허가예외 해당 없음</b><br>상황허가 대상입니다. 결과 요약 버튼을 눌러 점검 결과를 다운로드 하신 후 통상그룹 담당자에게 전달하여 주시기 바랍니다.');
+            return;
+          }
+          buildPrenotif(exceptionTargets().map(x=>x.model));
+          show('#card-prenotif');
+        };
+      }
+    };
+    wrapped.__exceptionDetailConsumerLaunchV1=true;
+    window.buildException=wrapped;
+  }
+  window.selectedException=function(){return state.exceptionChoice||EXCEPTION_OPTIONS.find(o=>state.exceptionChoice&&o.id===state.exceptionChoice.id)};
+})();
+</script>
+'''
+          if 'exception-detail-consumer-launch-v1' not in s:
+              head,sep,tail=s.rpartition('</body>')
+              s=head+script+'\n'+sep+tail
+              p.write_text(s,encoding='utf-8')
+          PY
+      - name: Commit patch
+        run: |
+          if git diff --quiet; then exit 0; fi
+          git config user.name github-actions
+          git config user.email github-actions@github.com
+          git add index.html
+          git commit -m "Add exception detail and consumer launch question"
+          git push
