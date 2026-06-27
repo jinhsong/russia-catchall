@@ -1,10 +1,69 @@
-name: Patch exact match preview disabled
+name: Patch FAQ on final preview
 
 on:
+  push:
+    branches:
+      - faq-ui-preview-final
   workflow_dispatch:
 
+permissions:
+  contents: write
+
 jobs:
-  noop:
+  patch:
     runs-on: ubuntu-latest
     steps:
-      - run: echo done
+      - uses: actions/checkout@v4
+      - name: Add FAQ and hide queue
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          import re
+          p=Path('index.html')
+          s=p.read_text(encoding='utf-8')
+          original=s
+          s=re.sub(r'\n?<div class="faq-modal" id="faq-modal"[\s\S]*?</div>\s*<script>\s*\(function\(\)\{var b=document.getElementById\(\'btn-faq\'\)[\s\S]*?</script>\n?','',s)
+          css='''
+#results-queue{display:none!important}.top{position:relative}.faq-top{margin-left:auto;border-color:var(--copper);color:var(--copper);background:#fff}.faq-modal{position:fixed;inset:0;z-index:100;background:rgba(21,36,61,.42);display:none;align-items:center;justify-content:center;padding:18px}.faq-modal.show{display:flex}.faq-panel{width:min(920px,100%);max-height:86vh;overflow:auto;background:var(--panel);border:1px solid var(--line2);border-radius:16px;box-shadow:0 18px 60px rgba(21,36,61,.28);padding:22px}.faq-head{display:flex;justify-content:space-between;gap:12px;align-items:center;margin-bottom:10px}.faq-head h2{font-family:'Noto Serif KR',serif;font-size:20px;margin:0}.faq-list details{background:#fff;border:1px solid var(--line);border-radius:12px;padding:12px 14px;margin:9px 0}.faq-list summary{cursor:pointer;font-weight:800;color:var(--ink)}.faq-list p{margin:8px 0 0;color:var(--soft);font-size:13.5px}.faq-close{min-width:42px}
+'''
+          if '.faq-modal' not in s:
+              s=s.replace('</style>',css+'</style>',1)
+          if 'id="btn-faq"' not in s:
+              s=s.replace('<header><div class="top"><div class="seal serif">수출</div><div><h1>상황허가 판정·사전신고 점검 도구</h1><div class="sub">CATCH-ALL CONTROL · SELF-CHECK</div></div></div><nav','<header><div class="top"><div class="seal serif">수출</div><div><h1>상황허가 판정·사전신고 점검 도구</h1><div class="sub">CATCH-ALL CONTROL · SELF-CHECK</div></div><button class="btn sm faq-top" id="btn-faq" type="button">FAQ</button></div><nav',1)
+          s=s.replace('모델별 결과에 따라 판정 신청, 허가예외, 의심징후 작업 큐로 분리합니다.','모델별 판정 결과를 확인하고 다음 단계로 진행합니다.')
+          faq='''
+<div class="faq-modal" id="faq-modal" aria-hidden="true"><div class="faq-panel"><div class="faq-head"><h2>자주 묻는 질문</h2><button class="btn sm faq-close" id="faq-close" type="button">닫기</button></div><div class="faq-list">
+<details open><summary>1. 이 도구는 무엇을 확인하는 건가요?</summary><p>모델명 기준으로 상황허가 판정 상태, 허가예외 가능성, 사전신고 필요 여부, 의심징후 점검 여부를 정리해 결과 요약을 만들기 위한 내부 점검 도구입니다.</p></details>
+<details><summary>2. 판정결과가 해당이면 바로 수출 가능한가요?</summary><p>아닙니다. 해당 모델은 허가예외 또는 사전신고 가능 여부를 추가로 확인해야 합니다. 판단이 애매하거나 상황허가가 필요해 보이면 통상그룹 담당자에게 문의하세요.</p></details>
+<details><summary>3. 판정결과가 없음 또는 만료이면 어떻게 하나요?</summary><p>판정 신청 품의 단계에서 모델명, 품목명, HS코드, 사양, 무게, 용도 등을 입력해 품의 초안을 만든 뒤 결과 요약을 첨부해 진행하세요.</p></details>
+<details><summary>4. 러시아 SERC 또는 SRR 거래는 의심징후 점검이 필요한가요?</summary><p>판정 신청 단계에서 수입국이 러시아만이고 최종사용자가 SERC 또는 SRR 중 하나인 경우에는 의심징후 점검을 생략하고 결과 요약으로 진행할 수 있습니다.</p></details>
+<details><summary>5. 러시아와 벨라루스를 동시에 선택하면 어떻게 하나요?</summary><p>벨라루스가 포함되면 벨라루스 최종사용자를 별도로 입력해야 합니다. 러시아 SERC/SRR만으로는 벨라루스 거래자 정보가 충족되지 않습니다.</p></details>
+<details><summary>6. 허가예외 해당 없음이면 어떻게 해야 하나요?</summary><p>상황허가 대상입니다. 결과 요약을 다운로드한 뒤 통상그룹 담당자에게 전달하여 후속 검토를 요청하세요.</p></details>
+<details><summary>7. 소비자 통신제품 허가예외를 선택하면 어떤 서류가 필요한가요?</summary><p>사전신고 시 6개월 이내 출시 확약서 산업통상부 서명본 첨부가 필요합니다.</p></details>
+<details><summary>8. 의료기기 거래는 어떤 추가 증빙이 필요한가요?</summary><p>설치 후 30일 내 설치확인서 1회, 설치 후 반기별 이행점검보고서 연 2회 등 최종사용자와 사용용도를 입증할 수 있는 추가 증빙이 필요합니다.</p></details>
+<details><summary>9. 사전신고 단계에서 SERC와 SRR을 동시에 넣어도 되나요?</summary><p>아니요. 사전신고 단계에서는 SERC 또는 SRR 중 하나만 선택해야 합니다. 선택한 값은 구매자, 최종수하인, 최종사용자에 동일하게 반영됩니다.</p></details>
+<details><summary>10. 품목 후보는 사전신고 단계에서 다시 판단하나요?</summary><p>아닙니다. 품목 판단은 2단계 판정결과 확인 기준으로 하고, 사전신고 단계에서는 확정된 품목 정보를 사용합니다.</p></details>
+<details><summary>11. 의심징후는 기본값이 있나요?</summary><p>없습니다. 예 또는 아니오를 사용자가 직접 선택해야 합니다. 미선택 항목이 있으면 결과 요약으로 넘어가지 않습니다.</p></details>
+<details><summary>12. 우려거래자 확인 결과 No Matching List Found가 나오면 어떻게 체크하나요?</summary><p>Tcode ZRMDD000940에서 No Matching List Found가 확인되면 해당 의심징후는 아니오로 체크하면 됩니다.</p></details>
+<details><summary>13. 구매자, 최종수하인, 최종사용자 중 하나라도 SERC/SRR이 아니면 어떻게 되나요?</summary><p>사전신고 이후 의심징후 단계로 이동합니다. 거래자 정보가 애매하거나 우려가 있으면 통상그룹에 문의하세요.</p></details>
+<details><summary>14. 결과 요약은 어디에 사용하나요?</summary><p>결과 요약을 다운로드해 품의나 후속 검토 자료에 첨부합니다. 상황허가 필요 건은 통상그룹 담당자에게 전달하세요.</p></details>
+<details><summary>15. 판단이 애매하면 어떻게 해야 하나요?</summary><p>자가 판단으로 종결하지 말고 결과 요약과 입력 내용을 통상그룹 담당자에게 공유해 검토를 요청하세요.</p></details>
+</div></div></div>
+<script>
+(function(){var b=document.getElementById('btn-faq'),m=document.getElementById('faq-modal'),c=document.getElementById('faq-close');function openFaq(){if(m){m.classList.add('show');m.setAttribute('aria-hidden','false')}}function closeFaq(){if(m){m.classList.remove('show');m.setAttribute('aria-hidden','true')}}if(b)b.onclick=openFaq;if(c)c.onclick=closeFaq;if(m)m.addEventListener('click',function(e){if(e.target===m)closeFaq()});document.addEventListener('keydown',function(e){if(e.key==='Escape')closeFaq()})})();
+</script>
+'''
+          if 'id="faq-modal"' not in s:
+              head,sep,tail=s.rpartition('</body>')
+              s=head+faq+sep+tail
+          if s!=original:
+              p.write_text(s,encoding='utf-8')
+          PY
+      - name: Commit patch
+        run: |
+          if git diff --quiet; then exit 0; fi
+          git config user.name github-actions
+          git config user.email github-actions@github.com
+          git add index.html
+          git commit -m "Restore FAQ on final preview branch"
+          git push
