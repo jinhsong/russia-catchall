@@ -1,10 +1,39 @@
-name: Patch FAQ UI disabled
+name: Patch exact match preview
 
 on:
+  push:
+    branches:
+      - exact-match-preview
   workflow_dispatch:
 
+permissions:
+  contents: write
+
 jobs:
-  noop:
+  patch:
     runs-on: ubuntu-latest
     steps:
-      - run: echo done
+      - uses: actions/checkout@v4
+      - name: Append exact match override
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          import re, base64
+          p=Path('index.html')
+          s=p.read_text(encoding='utf-8')
+          s=re.sub(r'\n?<script>\s*/\* exact-model-match-choices-v[0-9]+ \*/[\s\S]*?</script>\n?','',s)
+          payload='CjxzY3JpcHQ+Ci8qIGV4YWN0LW1vZGVsLW1hdGNoLWNob2ljZXMtdjEgKi8KKGZ1bmN0aW9uKCl7CiAgZnVuY3Rpb24gZXhhY3RNb2RlbEtleSh2KXtyZXR1cm4gU3RyaW5nKHZ8fCcnKS50cmltKCkudG9VcHBlckNhc2UoKTt9CiAgZnVuY3Rpb24gZGF0ZVNjb3JlKHYpe2NvbnN0IGQ9cGFyc2VEYXRlKHYpO3JldHVybiBkP2QuZ2V0VGltZSgpOjA7fQogIGZ1bmN0aW9uIG1ha2VMb29rdXBIaXQocixpbnB1dE1vZGVsKXsKICAgIGNvbnN0IGQ9cGFyc2VEYXRlKEYuZGV0RGF0ZShyKSk7CiAgICBjb25zdCBleHA9ZD9mbXREYXRlKGFkZFllYXJzKGQsMikpOkYuZXhwaXJ5KHIpOwogICAgY29uc3QgZXhwaXJlZD1leHA/bmV3IERhdGUoZXhwKydUMjM6NTk6NTknKTxuZXcgRGF0ZSgpOmZhbHNlOwogICAgcmV0dXJuIHttb2RlbDpGLm1vZGVsKHIpfHxpbnB1dE1vZGVsLGl0ZW06Ri5pdGVtKHIpLGhzOm5vcm1IUyhGLmhzKHIpKSxzcGVjOkYuc3BlYyhyKSxyZXN1bHQ6Ri5yZXN1bHQociksbnVtYmVyOkYubnVtYmVyKHIpLGRldERhdGU6ZD9mbXREYXRlKGQpOlMoRi5kZXREYXRlKHIpKSxleHBpcnk6ZXhwLHR5cGU6ci5fdHlwZSxpc0hhZTppc0hhZShGLnJlc3VsdChyKSksZXhwaXJlZCxyb3c6cixmb3VuZDp0cnVlLGlucHV0TW9kZWx9OwogIH0KICB3aW5kb3cubm9ybU1vZGVsPWV4YWN0TW9kZWxLZXk7CiAgd2luZG93Lmxvb2t1cE1vZGVsPWZ1bmN0aW9uKG1vZGVsKXsKICAgIGNvbnN0IHE9ZXhhY3RNb2RlbEtleShtb2RlbCk7CiAgICBjb25zdCBoaXRzPWFsbFJvd3MoKS5maWx0ZXIocj0+ZXhhY3RNb2RlbEtleShGLm1vZGVsKHIpKT09PXEpLm1hcChyPT5tYWtlTG9va3VwSGl0KHIsbW9kZWwpKTsKICAgIGlmKCFoaXRzLmxlbmd0aClyZXR1cm57bW9kZWwsZm91bmQ6ZmFsc2UsY2hvaWNlczpbXX07CiAgICBoaXRzLnNvcnQoKGEsYik9PmRhdGVTY29yZShiLmRldERhdGUpLWRhdGVTY29yZShhLmRldERhdGUpfHxOdW1iZXIoYi50eXBlPT09J+yghOusuO2MkOyglScpLU51bWJlcihhLnR5cGU9PT0n7KCE66y47YyQ7KCVJyl8fE51bWJlcihhLmV4cGlyZWQpLU51bWJlcihiLmV4cGlyZWQpKTsKICAgIGNvbnN0IGZpcnN0PXsuLi5oaXRzWzBdLGNob2ljZXM6aGl0cyxjaG9pY2VJZHg6MCxtdWx0aTpoaXRzLmxlbmd0aD4xfTsKICAgIHJldHVybiBmaXJzdDsKICB9OwogIGNvbnN0IG9sZFJlbmRlclJlc3VsdHM9d2luZG93LnJlbmRlclJlc3VsdHM7CiAgaWYodHlwZW9mIG9sZFJlbmRlclJlc3VsdHM9PT0nZnVuY3Rpb24nJiYhb2xkUmVuZGVyUmVzdWx0cy5fX2V4YWN0Q2hvaWNlVjEpewogICAgY29uc3Qgd3JhcHBlZD1mdW5jdGlvbigpewogICAgICBvbGRSZW5kZXJSZXN1bHRzLmFwcGx5KHRoaXMsYXJndW1lbnRzKTsKICAgICAgJCQoJyNyZXN1bHRzLWJvZHkgLm1jYXJkJykuZm9yRWFjaCgoY2FyZCxpZHgpPT57CiAgICAgICAgY29uc3QgTD1zdGF0ZS5sb29rdXBzW2lkeF07CiAgICAgICAgaWYoIUx8fCFMLmNob2ljZXN8fEwuY2hvaWNlcy5sZW5ndGg8MilyZXR1cm47CiAgICAgICAgY29uc3QgYm9keT1jYXJkLnF1ZXJ5U2VsZWN0b3IoJy5tYm9keScpOwogICAgICAgIGlmKCFib2R5fHxib2R5LnF1ZXJ5U2VsZWN0b3IoJ1tkYXRhLWxvb2t1cC1jaG9pY2VdJykpcmV0dXJuOwogICAgICAgIGNvbnN0IHdyYXA9ZG9jdW1lbnQuY3JlYXRlRWxlbWVudCgnZGl2Jyk7CiAgICAgICAgd3JhcC5jbGFzc05hbWU9J25vdGUgaW5mbyc7CiAgICAgICAgd3JhcC5pbm5lckhUTUw9JzxiPuuPmeydvCDrqqjrjbjrqoUg7YyQ7KCV7KCV67O06rCAIOyXrOufrCDqsbQg7J6I7Iq164uI64ukLjwvYj48YnI+PHNwYW4gY2xhc3M9InNtYWxsIj7soIHsmqntlaAg7YyQ7KCV6rG07J2EIOyEoO2Dne2VmOyEuOyalC4g7LWc7IugIO2MkOygleydvCDsiJzsnLzroZwg7KCV66Cs65CY7Ja0IOyeiOyKteuLiOuLpC48L3NwYW4+PHNlbGVjdCBkYXRhLWxvb2t1cC1jaG9pY2U9IicraWR4KyciIHN0eWxlPSJtYXJnaW4tdG9wOjhweCI+JytMLmNob2ljZXMubWFwKChjLGkpPT4nPG9wdGlvbiB2YWx1ZT0iJytpKyciPicrZXNjKChjLmRldERhdGV8fCctJykrJyDCtyAnKyhjLnR5cGV8fCctJykrJyDCtyAnKyhjLnJlc3VsdHx8Jy0nKSsnIMK3ICcrKGMubnVtYmVyfHwnLScpKycgwrcgSFMgJysoYy5oc3x8Jy0nKSsoYy5leHBpcmVkPycgwrcg66eM66OMJzonJykpKyc8L29wdGlvbj4nKS5qb2luKCcnKSsnPC9zZWxlY3Q+JzsKICAgICAgICBib2R5LnByZXBlbmQod3JhcCk7CiAgICAgICAgY29uc3Qgc2VsPXdyYXAucXVlcnlTZWxlY3Rvcignc2VsZWN0Jyk7CiAgICAgICAgc2VsLnZhbHVlPVN0cmluZyhMLmNob2ljZUlkeHx8MCk7CiAgICAgICAgc2VsLm9uY2hhbmdlPSgpPT57CiAgICAgICAgICBjb25zdCBpPStzZWwudmFsdWU7CiAgICAgICAgICBjb25zdCBuZXh0PXsuLi5MLmNob2ljZXNbaV0sY2hvaWNlczpMLmNob2ljZXMsY2hvaWNlSWR4OmksbXVsdGk6dHJ1ZX07CiAgICAgICAgICBzdGF0ZS5sb29rdXBzW2lkeF09bmV4dDsKICAgICAgICAgIHNhdmUoKTsKICAgICAgICAgIHJlbmRlclJlc3VsdHMoKTsKICAgICAgICB9OwogICAgICB9KTsKICAgIH07CiAgICB3cmFwcGVkLl9fZXhhY3RDaG9pY2VWMT10cnVlOwogICAgd2luZG93LnJlbmRlclJlc3VsdHM9d3JhcHBlZDsKICB9Cn0pKCk7Cjwvc2NyaXB0Pgo='
+          script=base64.b64decode(payload).decode('utf-8')
+          if 'exact-model-match-choices-v1' not in s:
+              head,sep,tail=s.rpartition('</body>')
+              s=head+script+'\n'+sep+tail
+              p.write_text(s,encoding='utf-8')
+          PY
+      - name: Commit patch
+        run: |
+          if git diff --quiet; then exit 0; fi
+          git config user.name github-actions
+          git config user.email github-actions@github.com
+          git add index.html
+          git commit -m "Add exact model match and duplicate selection"
+          git push
