@@ -14,7 +14,7 @@ html,body{margin:0;width:100%;height:100%;background:#f4f1e9;color:#15243d;font-
 (async function(){
   const stamp=Date.now();
   const appUrl='https://raw.githubusercontent.com/jinhsong/russia-catchall/exact-match-preview/index.html?v='+stamp;
-  const patchNames=['final-inject.js','prenotif-doc.js','summary-filename.js','summary-content.js','final-complete.js','back-nav.js','button-style.js'];
+  const patchNames=['final-inject.js','prenotif-doc.js','summary-filename.js','summary-content.js','final-complete.js','back-nav.js','button-style.js','remove-pledge-from-draft.js'];
   const pageBase=location.pathname.replace(/[^/]*$/,'');
   const rawBase='https://raw.githubusercontent.com/jinhsong/russia-catchall/faq-ui-preview-final/patches/';
   function replaceLast(str,search,replacement){const i=str.lastIndexOf(search);return i<0?str:str.slice(0,i)+replacement+str.slice(i+search.length);}
