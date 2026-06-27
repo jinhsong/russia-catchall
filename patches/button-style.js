@@ -12,13 +12,30 @@
       + '#btn-download:before{content:"⬇ ";font-weight:900}'
       + '#copy-pn-title,#copy-pn-body,.labelbar .btn.sm{background:#fff8ec!important;border-color:#9a6a32!important;color:#6f471d!important;box-shadow:0 3px 10px rgba(154,106,50,.12)!important}'
       + '.btn-prev-step{background:#fff8ec!important;border:1.5px solid #9a6a32!important;color:#7a4f1d!important;box-shadow:0 4px 12px rgba(154,106,50,.13)!important;font-weight:900!important}'
+      + '.btn-intermediate-summary{margin-left:auto!important;background:#fff!important;border-color:#9a6a32!important;color:#6f471d!important;box-shadow:0 4px 12px rgba(154,106,50,.12)!important}'
       + '.prev-step-toolbar{margin-top:18px;border-top:1px solid var(--line);padding-top:14px}'
       + '.toolbar{gap:10px}'
-      + '@media(max-width:560px){.toolbar .btn{width:100%;min-height:48px;font-size:15px}.labelbar .btn.sm{width:auto;min-height:38px}.btn-prev-step{text-align:center;justify-content:center}.prev-step-toolbar .btn-prev-step{width:100%}#btn-prenotif-save.btn-generate-draft{width:100%;min-height:52px}}';
+      + '@media(max-width:560px){.toolbar .btn{width:100%;min-height:48px;font-size:15px}.labelbar .btn.sm{width:auto;min-height:38px}.btn-prev-step{text-align:center;justify-content:center}.prev-step-toolbar .btn-prev-step{width:100%}#btn-prenotif-save.btn-generate-draft{width:100%;min-height:52px}.btn-intermediate-summary{margin-left:0!important}}';
     var el=document.createElement('style');
     el.id='button-style-patch';
     el.textContent=css;
     document.head.appendChild(el);
+  }
+  function isFinalSummaryButton(btn){
+    if(!btn) return false;
+    if(btn.closest('#card-summary')) return true;
+    if(btn.classList.contains('final-summary') || btn.textContent.indexOf('결과 요약으로 이동')>=0) return true;
+    return false;
+  }
+  function enhanceSummaryButtons(){
+    ['go-summary','cl-summary','ex-summary'].forEach(function(id){
+      var b=document.getElementById(id);
+      if(!b) return;
+      b.classList.add('btn-intermediate-summary');
+      if(!isFinalSummaryButton(b)) b.textContent='중간결과 요약';
+      var tb=b.closest('.toolbar');
+      if(tb) tb.style.width='100%';
+    });
   }
   function enhance(){
     var gen=document.getElementById('btn-prenotif-save');
@@ -26,6 +43,7 @@
     var cont=document.getElementById('pn-continue-flow');
     if(cont){ cont.classList.add('primary'); }
     document.querySelectorAll('.btn-prev-step').forEach(function(b){b.classList.add('btn-previous-emphasis');});
+    enhanceSummaryButtons();
   }
   onReady(function(){ addStyle(); enhance(); document.addEventListener('click',function(){setTimeout(enhance,40);},true); document.addEventListener('change',function(){setTimeout(enhance,40);},true); });
 })();
