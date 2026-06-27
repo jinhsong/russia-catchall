@@ -1,5 +1,6 @@
 (function(){
   function onReady(fn){ if(document.readyState==='loading') document.addEventListener('DOMContentLoaded',fn); else fn(); }
+  var savedContinue=null;
   function money(v){ var n=Number(v||0); return isFinite(n)?n.toLocaleString(undefined,{minimumFractionDigits:0,maximumFractionDigits:2}):''; }
   function total(q,p){ var a=Number(q||0), b=Number(p||0); return isFinite(a*b)?money(a*b):''; }
   function currentException(){ return state.exceptionChoice || (typeof selectedException==='function'?selectedException():null) || {}; }
@@ -107,6 +108,7 @@
     return '<ul><li>첨부 1. 결과 요약</li></ul>';
   }
   function buildDoc(){
+    if(typeof syncInvoices==='function') syncInvoices();
     var rows=flattenRows();
     var title=(countriesText()||'{국가명}')+' '+(firstEndUser()||'{최종사용자}')+' 사전신고 신청 품의 '+(firstModel()||'{모델명 등}');
     var body='<p>'+(countriesText()||'{국가명}')+' 상황허가 대상품목 수출을 위한 사전신고 품의를 다음과 같이 상신합니다.</p><h4>1. 사전신고 신청건</h4>'+tableHtml(rows)+'<h4>2. 첨부파일</h4>'+evidenceGuideHtml()+attachmentsHtml();
@@ -122,17 +124,41 @@
       if(err) err.insertAdjacentHTML('afterend','<div id="prenotif-doc-out"></div>');
       out=document.getElementById('prenotif-doc-out');
     }
-    var d=state.prenotifDoc || buildDoc();
+    var d=buildDoc();
     out.innerHTML='<div class="divider"></div>'+note('danger','<b>상신 전 반드시 확인하세요</b><ul><li>아래 제목과 본문을 복사하여 사전신고 품의에 사용하세요.</li><li>첨부파일 목록은 허가예외 선택값에 따라 자동 구성됩니다.</li><li>결과 요약은 다음 단계에서 다운로드 후 첨부하세요.</li></ul>')+'<div class="labelbar"><label class="fld">제목</label><button class="btn sm" id="copy-pn-title">제목 복사</button></div><div class="memo" id="prenotif-title" contenteditable="true" style="min-height:58px" aria-label="사전신고 품의 제목">'+esc(d.title)+'</div><div class="labelbar"><label class="fld">본문</label><button class="btn sm" id="copy-pn-body">본문 복사</button></div><div class="memo" id="prenotif-body" aria-readonly="true">'+d.bodyHtml+'</div><div class="toolbar"><button class="btn primary" id="pn-continue-flow">저장 · 다음 단계로 이동</button></div>';
     document.getElementById('prenotif-title').addEventListener('input',function(e){state.prenotifDoc.title=e.target.innerText.trim(); if(typeof save==='function') save();});
     document.getElementById('copy-pn-title').onclick=function(e){copyPlain(document.getElementById('prenotif-title').innerText.trim(),e.target);};
     document.getElementById('copy-pn-body').onclick=function(e){copyRich(document.getElementById('prenotif-body'),e.target);};
     document.getElementById('pn-continue-flow').onclick=function(){ if(typeof oldContinue==='function') oldContinue(); else {state.preDone=true; if(typeof buildSummary==='function') buildSummary(); if(typeof show==='function') show('#card-summary');} };
+    if(typeof save==='function') save();
+  }
+  function refreshDocIfVisible(){
+    if(document.getElementById('prenotif-doc-out')) renderDoc(savedContinue);
+  }
+  function invalidatePrenotifDoc(){
+    if(state.prenotifDoc) delete state.prenotifDoc;
+    if(typeof save==='function') save();
+    setTimeout(refreshDocIfVisible,40);
+  }
+  function patchExceptionInvalidation(){
+    if(document.body.dataset.prenotifExceptionInvalidation) return;
+    document.body.dataset.prenotifExceptionInvalidation='1';
+    document.addEventListener('change',function(e){
+      var t=e.target;
+      if(!t) return;
+      if(t.name==='ex' || t.name==='ex-repair-type' || t.name==='ex-consumer-released') invalidatePrenotifDoc();
+    },true);
+    document.addEventListener('click',function(e){
+      var t=e.target;
+      if(t && t.id==='ex-continue') setTimeout(function(){ delete state.prenotifDoc; if(typeof save==='function') save(); },20);
+    },true);
   }
   function install(){
     var btn=document.getElementById('btn-prenotif-save');
-    if(!btn || btn.dataset.prenotifDocPatch) return;
+    if(!btn) return;
+    if(btn.dataset.prenotifDocPatch){ refreshDocIfVisible(); return; }
     var old=btn.onclick;
+    savedContinue=old;
     btn.dataset.prenotifDocPatch='1';
     btn.textContent='사전신고 품의 생성';
     btn.onclick=function(e){
@@ -141,11 +167,10 @@
       var er=document.getElementById('pn-err');
       if(errs.length){ if(er) er.innerHTML=note('danger','입력을 확인하세요.<ul>'+errs.map(function(x){return '<li>'+esc(x)+'</li>';}).join('')+'</ul>'); return; }
       if(er) er.innerHTML='';
-      buildDoc();
       state.preDone=true;
-      if(typeof save==='function') save();
       renderDoc(old);
     };
+    refreshDocIfVisible();
   }
-  onReady(function(){ install(); document.addEventListener('click',function(){setTimeout(install,30);},true); });
+  onReady(function(){ install(); patchExceptionInvalidation(); document.addEventListener('click',function(){setTimeout(function(){install();refreshDocIfVisible();},30);},true); document.addEventListener('input',function(e){ if(e.target&&e.target.closest&&e.target.closest('#card-prenotif')) setTimeout(refreshDocIfVisible,80); },true); document.addEventListener('change',function(e){ if(e.target&&e.target.closest&&e.target.closest('#card-prenotif')) setTimeout(refreshDocIfVisible,80); },true); });
 })();
