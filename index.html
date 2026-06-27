@@ -285,5 +285,56 @@ function money(n){return (Number(n)||0).toLocaleString('en-US',{minimumFractionD
 })();
 </script>
 
+
+<script>
+/* exact-model-match-choices-v1 */
+(function(){
+  function exactModelKey(v){return String(v||'').trim().toUpperCase();}
+  function dateScore(v){const d=parseDate(v);return d?d.getTime():0;}
+  function makeLookupHit(r,inputModel){
+    const d=parseDate(F.detDate(r));
+    const exp=d?fmtDate(addYears(d,2)):F.expiry(r);
+    const expired=exp?new Date(exp+'T23:59:59')<new Date():false;
+    return {model:F.model(r)||inputModel,item:F.item(r),hs:normHS(F.hs(r)),spec:F.spec(r),result:F.result(r),number:F.number(r),detDate:d?fmtDate(d):S(F.detDate(r)),expiry:exp,type:r._type,isHae:isHae(F.result(r)),expired,row:r,found:true,inputModel};
+  }
+  window.normModel=exactModelKey;
+  window.lookupModel=function(model){
+    const q=exactModelKey(model);
+    const hits=allRows().filter(r=>exactModelKey(F.model(r))===q).map(r=>makeLookupHit(r,model));
+    if(!hits.length)return{model,found:false,choices:[]};
+    hits.sort((a,b)=>dateScore(b.detDate)-dateScore(a.detDate)||Number(b.type==='전문판정')-Number(a.type==='전문판정')||Number(a.expired)-Number(b.expired));
+    const first={...hits[0],choices:hits,choiceIdx:0,multi:hits.length>1};
+    return first;
+  };
+  const oldRenderResults=window.renderResults;
+  if(typeof oldRenderResults==='function'&&!oldRenderResults.__exactChoiceV1){
+    const wrapped=function(){
+      oldRenderResults.apply(this,arguments);
+      $$('#results-body .mcard').forEach((card,idx)=>{
+        const L=state.lookups[idx];
+        if(!L||!L.choices||L.choices.length<2)return;
+        const body=card.querySelector('.mbody');
+        if(!body||body.querySelector('[data-lookup-choice]'))return;
+        const wrap=document.createElement('div');
+        wrap.className='note info';
+        wrap.innerHTML='<b>동일 모델명 판정정보가 여러 건 있습니다.</b><br><span class="small">적용할 판정건을 선택하세요. 최신 판정일 순으로 정렬되어 있습니다.</span><select data-lookup-choice="'+idx+'" style="margin-top:8px">'+L.choices.map((c,i)=>'<option value="'+i+'">'+esc((c.detDate||'-')+' · '+(c.type||'-')+' · '+(c.result||'-')+' · '+(c.number||'-')+' · HS '+(c.hs||'-')+(c.expired?' · 만료':''))+'</option>').join('')+'</select>';
+        body.prepend(wrap);
+        const sel=wrap.querySelector('select');
+        sel.value=String(L.choiceIdx||0);
+        sel.onchange=()=>{
+          const i=+sel.value;
+          const next={...L.choices[i],choices:L.choices,choiceIdx:i,multi:true};
+          state.lookups[idx]=next;
+          save();
+          renderResults();
+        };
+      });
+    };
+    wrapped.__exactChoiceV1=true;
+    window.renderResults=wrapped;
+  }
+})();
+</script>
+
 </body>
 </html>
