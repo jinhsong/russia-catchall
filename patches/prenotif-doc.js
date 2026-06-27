@@ -1,6 +1,12 @@
 (function(){
   function onReady(fn){ if(document.readyState==='loading') document.addEventListener('DOMContentLoaded',fn); else fn(); }
   var savedContinue=null;
+  function setGenerateButtonVisible(visible){
+    var btn=document.getElementById('btn-prenotif-save');
+    if(!btn) return;
+    btn.style.display=visible?'':'none';
+    btn.setAttribute('aria-hidden', visible?'false':'true');
+  }
   function money(v){ var n=Number(v||0); return isFinite(n)?n.toLocaleString(undefined,{minimumFractionDigits:0,maximumFractionDigits:2}):''; }
   function total(q,p){ var a=Number(q||0), b=Number(p||0); return isFinite(a*b)?money(a*b):''; }
   function currentException(){ return state.exceptionChoice || (typeof selectedException==='function'?selectedException():null) || {}; }
@@ -124,6 +130,8 @@
       if(err) err.insertAdjacentHTML('afterend','<div id="prenotif-doc-out"></div>');
       out=document.getElementById('prenotif-doc-out');
     }
+    document.body.dataset.prenotifDocVisible='1';
+    setGenerateButtonVisible(false);
     var d=buildDoc();
     out.innerHTML='<div class="divider"></div>'+note('danger','<b>상신 전 반드시 확인하세요</b><ul><li>아래 제목과 본문을 복사하여 사전신고 품의에 사용하세요.</li><li>첨부파일 목록은 허가예외 선택값에 따라 자동 구성됩니다.</li><li>결과 요약은 다음 단계에서 다운로드 후 첨부하세요.</li></ul>')+'<div class="labelbar"><label class="fld">제목</label><button class="btn sm" id="copy-pn-title">제목 복사</button></div><div class="memo" id="prenotif-title" contenteditable="true" style="min-height:58px" aria-label="사전신고 품의 제목">'+esc(d.title)+'</div><div class="labelbar"><label class="fld">본문</label><button class="btn sm" id="copy-pn-body">본문 복사</button></div><div class="memo" id="prenotif-body" aria-readonly="true">'+d.bodyHtml+'</div><div class="toolbar"><button class="btn primary" id="pn-continue-flow">저장 · 다음 단계로 이동</button></div>';
     document.getElementById('prenotif-title').addEventListener('input',function(e){state.prenotifDoc.title=e.target.innerText.trim(); if(typeof save==='function') save();});
@@ -133,7 +141,9 @@
     if(typeof save==='function') save();
   }
   function refreshDocIfVisible(){
-    if(document.getElementById('prenotif-doc-out')) renderDoc(savedContinue);
+    var out=document.getElementById('prenotif-doc-out');
+    if(document.body.dataset.prenotifDocVisible==='1' && out && out.innerHTML.trim()) renderDoc(savedContinue);
+    else setGenerateButtonVisible(true);
   }
   function invalidatePrenotifDoc(){
     if(state.prenotifDoc) delete state.prenotifDoc;
@@ -150,7 +160,7 @@
     },true);
     document.addEventListener('click',function(e){
       var t=e.target;
-      if(t && t.id==='ex-continue') setTimeout(function(){ delete state.prenotifDoc; if(typeof save==='function') save(); },20);
+      if(t && t.id==='ex-continue') setTimeout(function(){ delete state.prenotifDoc; document.body.dataset.prenotifDocVisible='0'; setGenerateButtonVisible(true); if(typeof save==='function') save(); },20);
     },true);
   }
   function install(){
@@ -161,6 +171,7 @@
     savedContinue=old;
     btn.dataset.prenotifDocPatch='1';
     btn.textContent='사전신고 품의 생성';
+    btn.classList.add('primary','btn-generate-draft');
     btn.onclick=function(e){
       if(e) e.preventDefault();
       var errs=validatePrenotifDoc();
