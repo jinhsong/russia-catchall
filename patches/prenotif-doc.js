@@ -11,13 +11,14 @@
   function total(q,p){ var a=Number(q||0), b=Number(p||0); return isFinite(a*b)?money(a*b):''; }
   function currentException(){ return state.exceptionChoice || (typeof selectedException==='function'?selectedException():null) || {}; }
   function exceptionExtra(){ return state.exceptionExtra || {}; }
+  function repairDetail(){ var ex=currentException(); return ex.title || ex.repairType || exceptionExtra().repairType || ''; }
   function exLabel(){
     var ex=currentException();
     if(ex.id==='consumer') return '소비자 통신기기';
     if(ex.id==='medical') return '의료기기';
     if(ex.id==='return') return '반송(제26조제1항제5호)';
     if(ex.id==='exhibition') return '전시회(제26조제1항제8호)';
-    if(ex.id==='repair') return ex.title || ex.repairType || exceptionExtra().repairType || '보정, 수리(제26조제1항제15호)';
+    if(ex.id==='repair') return repairDetail() || '보정, 수리/검사, 시험';
     return ex.title || '-';
   }
   function consumerReleased(){
@@ -28,7 +29,7 @@
   }
   function isConsumerReleased(){ return consumerReleased()==='yes'; }
   function isConsumerUnreleased(){ return consumerReleased()==='no'; }
-  function isRepairException(){ return currentException().id==='repair'; }
+  function isRepairException(){ return currentException().id==='repair' && !!repairDetail(); }
   function firstModel(){
     var rows=flattenRows();
     if(!rows.length) return '';
