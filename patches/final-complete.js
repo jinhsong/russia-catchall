@@ -18,15 +18,26 @@
     };
     snapshot.__finalComplete=true;
   }
+  function exLabel(){
+    var ex=state.exceptionChoice||{}, extra=state.exceptionExtra||{};
+    if(ex.id==='consumer') return '소비자 통신기기';
+    if(ex.id==='medical') return '의료기기';
+    if(ex.id==='return') return '반송(제26조제1항제5호)';
+    if(ex.id==='exhibition') return '전시회(제26조제1항제8호)';
+    if(ex.id==='repair') return ex.title||extra.repairType||'보정, 수리/검사, 시험';
+    return ex.title||'';
+  }
   function consumerReleased(){
     var ex=state.exceptionChoice||{}, extra=state.exceptionExtra||{};
     if(ex.id!=='consumer') return '';
     return ex.consumerReleased||extra.consumerReleased||'';
   }
   function attachmentGuide(){
+    var ex=state.exceptionChoice||{};
     var rel=consumerReleased();
-    if(rel==='yes') return '<ul><li>첨부 1. 삼성닷컴 등 오픈마켓 판매 중 화면 캡처</li><li>첨부 2. 결과 요약</li></ul>';
-    if(rel==='no') return '<ul><li>첨부 1. 6개월 이내 출시 확약서(산업통상자원부)</li><li>첨부 2. 6개월 이내 출시 확약서 결재파일</li><li>첨부 3. 결과 요약</li></ul>';
+    if(ex.id==='consumer'&&rel==='yes') return '<p><b>소비자 통신기기 출시 증빙 안내</b></p><ul><li>첨부 1. 오픈마켓 출시 증빙</li><li>첨부 2. 결과 요약</li></ul>';
+    if(ex.id==='consumer'&&rel==='no') return '<p><b>소비자 통신기기 미출시 제품 안내</b></p><ul><li>첨부 1. 6개월 이내 출시 확약서(산업통상자원부)</li><li>첨부 2. 6개월 이내 출시 확약서 결재파일</li><li>첨부 3. 결과 요약</li></ul>';
+    if(ex.id==='repair') return '<p><b>'+esc(exLabel())+' 증빙 안내</b></p><ul><li>수출 물품 사진, 고유번호(시리얼번호, 각인번호 등)가 보이는 사진, 고유번호를 기재한 파일 제출이 필요합니다.</li><li>추후 1년 이내 해당 물품에 대한 재수입증명 또는 폐기증명서 제출이 필요합니다.</li><li>첨부 1. 수출물품 고유번호 증빙</li><li>첨부 2. 결과 요약</li></ul>';
     return '';
   }
   function patchPrenotifDoc(){
@@ -39,13 +50,10 @@
         var guide=attachmentGuide();
         if(!body || !guide) return;
         var html=body.innerHTML;
-        if(html.indexOf('삼성닷컴 등 오픈마켓 판매 중 화면 캡처')>=0) return;
-        if(consumerReleased()==='yes'){
-          html=html.replace(/<h4>2\. 첨부파일<\/h4><ul>[\s\S]*?<\/ul>/,'<h4>2. 첨부파일</h4>'+guide);
-          body.innerHTML=html;
-          if(state.prenotifDoc) state.prenotifDoc.bodyHtml=html;
-          if(typeof save==='function') save();
-        }
+        html=html.replace(/<h4>2\. 첨부파일<\/h4>[\s\S]*?(?=<\/div>|$)/,'<h4>2. 첨부파일</h4>'+guide);
+        body.innerHTML=html;
+        if(state.prenotifDoc) state.prenotifDoc.bodyHtml=html;
+        if(typeof save==='function') save();
       },80);
     },true);
   }
@@ -60,17 +68,16 @@
         var ex=state.exceptionChoice||{}, extra=state.exceptionExtra||{};
         var rows=[];
         if(ex.id){
-          var title=ex.title||'';
-          if(ex.id==='consumer') title='소비자 통신기기';
-          if(ex.id==='medical') title='의료기기';
-          if(ex.id==='return') title='반송(제26조제1항제5호)';
-          if(ex.id==='exhibition') title='전시회(제26조제1항제8호)';
-          if(ex.id==='repair') title=ex.title||extra.repairType||'보정, 수리/검사, 시험';
+          var title=exLabel();
           rows.push('<li>허가예외 종류: <b>'+esc(title)+'</b></li>');
           if(ex.id==='consumer'){
             var rel=ex.consumerReleased||extra.consumerReleased||'';
-            if(rel==='yes') rows.push('<li>출시 여부: <b>이미 출시된 제품</b></li><li>첨부 안내: 삼성닷컴 등 오픈마켓 판매 중 화면 캡처</li>');
-            if(rel==='no') rows.push('<li>출시 여부: <b>미출시 제품</b></li><li>첨부 안내: 6개월 이내 출시 확약서 및 결재본(eml 파일)</li>');
+            if(rel==='yes') rows.push('<li>출시 여부: <b>이미 출시된 제품</b></li><li>첨부 안내: 오픈마켓 출시 증빙, 결과 요약</li>');
+            if(rel==='no') rows.push('<li>출시 여부: <b>미출시 제품</b></li><li>첨부 안내: 6개월 이내 출시 확약서 및 결재본(eml 파일), 결과 요약</li>');
+          }
+          if(ex.id==='repair'){
+            rows.push('<li>첨부 안내: 수출물품 고유번호 증빙, 결과 요약</li>');
+            rows.push('<li>사후 제출: 1년 이내 재수입증명 또는 폐기증명서</li>');
           }
         }
         if(state.prenotifDoc) rows.push('<li>사전신고 품의 자동작성: <b>완료</b></li><li>품의 제목: '+esc(state.prenotifDoc.title||'-')+'</li>');
