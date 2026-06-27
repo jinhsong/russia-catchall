@@ -14,8 +14,13 @@
     rows.push('<li>허가예외 종류: <b>'+esc(title)+'</b></li>');
     if(ex.id==='consumer'){
       var rel=ex.consumerReleased||extra.consumerReleased||'';
-      if(rel==='yes') rows.push('<li>출시 여부: <b>이미 출시된 제품</b></li><li>사전신고 첨부: 삼성닷컴 등 오픈마켓 판매 중 화면 캡처</li>');
-      if(rel==='no') rows.push('<li>출시 여부: <b>미출시 제품</b></li><li>사전신고 첨부: 6개월 이내 출시 확약서(산업통상자원부) 및 결재본(eml 파일)</li><li>진행 안내: 확약서 서명 후 파트장 결재, 통상그룹 통보</li>');
+      if(rel==='yes') rows.push('<li>출시 여부: <b>이미 출시된 제품</b></li><li>사전신고 첨부: 오픈마켓 출시 증빙 및 결과 요약</li>');
+      if(rel==='no') rows.push('<li>출시 여부: <b>미출시 제품</b></li><li>사전신고 첨부: 6개월 이내 출시 확약서(산업통상자원부), 결재본(eml 파일), 결과 요약</li><li>진행 안내: 확약서 서명 후 파트장 결재, 통상그룹 통보</li>');
+    }
+    if(ex.id==='repair'){
+      rows.push('<li>사전신고 첨부: 수출물품 고유번호 증빙 및 결과 요약</li>');
+      rows.push('<li>증빙 안내: 수출 물품 사진, 고유번호(시리얼번호, 각인번호 등)가 보이는 사진, 고유번호를 기재한 파일 제출 필요</li>');
+      rows.push('<li>사후 제출: 1년 이내 재수입증명 또는 폐기증명서 제출 필요</li>');
     }
     return '<h3>허가예외 세부 확인</h3><ul>'+rows.join('')+'</ul>';
   }
