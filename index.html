@@ -5,34 +5,46 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>상황허가 판정·사전신고 점검 도구</title>
 <style>
-html,body{margin:0;width:100%;height:100%;background:#f4f1e9;color:#15243d;font-family:system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif}.loading{min-height:100vh;display:flex;align-items:center;justify-content:center;text-align:center;padding:24px}.box{background:#faf8f2;border:1px solid #d9d2c2;border-radius:16px;padding:24px;box-shadow:0 8px 24px rgba(21,36,61,.08)}iframe{border:0;width:100%;height:100vh;display:block}
+html,body{margin:0;width:100%;height:100%;background:#f4f1e9;color:#15243d;font-family:system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif}.loading{min-height:100vh;display:flex;align-items:center;justify-content:center;text-align:center;padding:24px}.box{background:#faf8f2;border:1px solid #d9d2c2;border-radius:16px;padding:24px;box-shadow:0 8px 24px rgba(21,36,61,.08)}iframe{border:0;width:100%;height:100vh;display:block}.warn{margin-top:10px;color:#9c2b25;font-size:12px}
 </style>
 </head>
 <body>
 <div class="loading"><div class="box"><b>도구를 불러오는 중입니다.</b><br>Final 결과물을 준비하고 있습니다.</div></div>
 <script>
 (async function(){
-  const appUrl='https://raw.githubusercontent.com/jinhsong/russia-catchall/exact-match-preview/index.html?v='+Date.now();
-  const patchUrls=[
-    'https://raw.githubusercontent.com/jinhsong/russia-catchall/faq-ui-preview-final/patches/final-inject.js?v='+Date.now(),
-    'https://raw.githubusercontent.com/jinhsong/russia-catchall/faq-ui-preview-final/patches/prenotif-doc.js?v='+Date.now(),
-    'https://raw.githubusercontent.com/jinhsong/russia-catchall/faq-ui-preview-final/patches/summary-filename.js?v='+Date.now(),
-    'https://raw.githubusercontent.com/jinhsong/russia-catchall/faq-ui-preview-final/patches/summary-content.js?v='+Date.now(),
-    'https://raw.githubusercontent.com/jinhsong/russia-catchall/faq-ui-preview-final/patches/final-complete.js?v='+Date.now(),
-    'https://raw.githubusercontent.com/jinhsong/russia-catchall/faq-ui-preview-final/patches/back-nav.js?v='+Date.now()
-  ];
+  const stamp=Date.now();
+  const appUrl='https://raw.githubusercontent.com/jinhsong/russia-catchall/exact-match-preview/index.html?v='+stamp;
+  const patchNames=['final-inject.js','prenotif-doc.js','summary-filename.js','summary-content.js','final-complete.js','back-nav.js'];
+  const pageBase=location.pathname.replace(/[^/]*$/,'');
+  const rawBase='https://raw.githubusercontent.com/jinhsong/russia-catchall/faq-ui-preview-final/patches/';
   function replaceLast(str,search,replacement){const i=str.lastIndexOf(search);return i<0?str:str.slice(0,i)+replacement+str.slice(i+search.length);}
+  async function fetchText(url){const r=await fetch(url,{cache:'no-store'});if(!r.ok)throw new Error(url+' -> '+r.status);return r.text();}
+  async function fetchPatch(name){
+    const local=pageBase+'patches/'+name+'?v='+stamp;
+    const raw=rawBase+name+'?v='+stamp;
+    try{return {name,text:await fetchText(local),from:'local'};}catch(e1){
+      try{return {name,text:await fetchText(raw),from:'raw'};}catch(e2){
+        console.warn('Patch load failed',name,e1,e2);
+        return {name,text:'',failed:true,error:String(e2)};
+      }
+    }
+  }
   try{
-    let html=await fetch(appUrl,{cache:'no-store'}).then(r=>{if(!r.ok)throw new Error('app fetch failed '+r.status);return r.text();});
-    const patches=await Promise.all(patchUrls.map(u=>fetch(u,{cache:'no-store'}).then(r=>{if(!r.ok)throw new Error('patch fetch failed '+r.status);return r.text();})));
-    const script='<script>'+patches.join('\n;\n').replace(/<\/script>/gi,'<\\/script>')+'<\/script>';
+    let html=await fetchText(appUrl);
+    const loaded=await Promise.all(patchNames.map(fetchPatch));
+    const patches=loaded.filter(x=>!x.failed).map(x=>x.text);
+    const failed=loaded.filter(x=>x.failed).map(x=>x.name);
+    let script='<script>'+patches.join('\n;\n').replace(/<\/script>/gi,'<\\/script>')+'<\/script>';
+    if(failed.length){
+      script+='<script>console.warn("일부 패치를 불러오지 못했습니다: '+failed.join(', ')+'");<\/script>';
+    }
     html=replaceLast(html,'</body>',script+'</body>');
     const iframe=document.createElement('iframe');
     iframe.srcdoc=html;
     document.body.innerHTML='';
     document.body.appendChild(iframe);
   }catch(e){
-    document.body.innerHTML='<div class="loading"><div class="box"><b>도구를 불러오지 못했습니다.</b><br><small>'+String(e)+'</small></div></div>';
+    document.body.innerHTML='<div class="loading"><div class="box"><b>도구를 불러오지 못했습니다.</b><br><small>'+String(e)+'</small><div class="warn">새로고침 후에도 반복되면 캐시를 지우거나 URL 뒤의 v 값을 바꿔 주세요.</div></div></div>';
   }
 })();
 </script>
