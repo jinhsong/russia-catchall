@@ -81,3 +81,45 @@
   function ready(fn){if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',fn);else fn();}
   ready(function(){install();document.addEventListener('click',function(){setTimeout(install,50);},true);document.addEventListener('change',function(e){if(e.target&&e.target.closest&&e.target.closest('#card-prenotif'))setTimeout(check,50);},true);document.addEventListener('input',function(e){if(e.target&&e.target.closest&&e.target.closest('#card-prenotif'))setTimeout(check,80);},true);});
 })();
+
+(function(){
+  function onReady(fn){ if(document.readyState==='loading') document.addEventListener('DOMContentLoaded',fn); else fn(); }
+  function expiredMap(){
+    var m={};
+    try{(state.lookups||[]).forEach(function(L){ if(L&&L.expired) m[String(L.model||'').trim()]=L.number||'-'; });}catch(e){}
+    return m;
+  }
+  function patchExpiredRemarks(){
+    var body=document.getElementById('form-body');
+    if(!body) return;
+    var map=expiredMap();
+    if(!Object.keys(map).length) return;
+    var changed=false;
+    body.querySelectorAll('table tbody tr').forEach(function(tr){
+      var td=tr.querySelectorAll('td');
+      if(td.length<7) return;
+      var model=String(td[3].textContent||'').trim();
+      if(Object.prototype.hasOwnProperty.call(map,model)){
+        var val='이전 판정발급번호: '+(map[model]||'-');
+        if(td[6].textContent.trim()!==val){td[6].textContent=val; changed=true;}
+      }
+    });
+    if(changed && state.classifyDoc){
+      state.classifyDoc.bodyHtml=body.innerHTML;
+      if(state.classifyDoc.items){
+        state.classifyDoc.items.forEach(function(it){
+          var model=String(it.model||'').trim();
+          if(Object.prototype.hasOwnProperty.call(map,model)) it.remark='이전 판정발급번호: '+(map[model]||'-');
+        });
+      }
+      if(typeof save==='function') save();
+    }
+  }
+  function install(){patchExpiredRemarks();}
+  onReady(function(){
+    install();
+    document.addEventListener('click',function(){setTimeout(install,80);},true);
+    document.addEventListener('input',function(e){if(e.target&&e.target.closest&&e.target.closest('#card-classify'))setTimeout(install,80);},true);
+    document.addEventListener('change',function(e){if(e.target&&e.target.closest&&e.target.closest('#card-classify'))setTimeout(install,80);},true);
+  });
+})();
