@@ -10,6 +10,8 @@
       + '.cert-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:10px}'
       + '.cert-grid .full{grid-column:1/-1}'
       + '.cert-actions{display:flex;gap:8px;flex-wrap:wrap;margin-top:12px}'
+      + '.cert-file-card{border:1px solid var(--line);border-radius:14px;padding:12px;margin-top:12px;background:#fff}'
+      + '.cert-file-title{font-weight:900;margin-bottom:8px}'
       + '@media(max-width:560px){.cert-grid{grid-template-columns:1fr}.cert-grid .full{grid-column:auto}.cert-actions .btn{width:100%}}';
     var s=document.createElement('style');
     s.id='classification-pdf-style';
@@ -23,19 +25,23 @@
   function currentModelOptions(){
     return (state.lookups||state.models||[]).map(function(x){return typeof x==='string'?x:x.model;}).filter(Boolean);
   }
+  function modelSelectHtml(id,selected){
+    var models=currentModelOptions();
+    var opts=models.map(function(m){return '<option value="'+escLocal(m)+'" '+(m===selected?'selected':'')+'>'+escLocal(m)+'</option>';}).join('');
+    if(selected && !models.includes(selected)) opts='<option value="'+escLocal(selected)+'" selected>'+escLocal(selected)+'</option>'+opts;
+    return '<select id="'+id+'">'+opts+'</select>';
+  }
   function renderPanel(){
     var next=document.getElementById('results-next');
     if(!next) return;
     var old=document.getElementById('cert-upload-panel');
     if(old) old.remove();
-    var models=currentModelOptions();
     var html='<details id="cert-upload-panel" class="mcard"><summary>판정서 PDF 첨부로 판정정보 불러오기</summary>'
       + '<div class="mbody">'
-      + noteLocal('info','<b>판정서를 가지고 있는 경우 여기에 첨부해주시기 바랍니다.</b><br>텍스트 PDF 판정서에서 상황허가 대상품목 해당 여부, 모델명, 제품명/물품명, 판정발급번호, HS 번호를 파싱합니다.')
-      + '<label class="fld" style="margin-top:10px">적용할 모델</label>'
-      + '<select id="cert-target-model">'+models.map(function(m){return '<option value="'+escLocal(m)+'">'+escLocal(m)+'</option>';}).join('')+'</select>'
-      + '<label class="fld" style="margin-top:10px">판정서 PDF</label>'
-      + '<input type="file" id="cert-pdf-file" accept="application/pdf">'
+      + noteLocal('info','<b>판정서를 가지고 있는 경우 여기에 첨부해주시기 바랍니다.</b><br>여러 모델의 판정서 PDF를 한 번에 업로드할 수 있습니다. 텍스트 PDF에서 상황허가 대상품목 해당 여부, 모델명, 제품명/물품명, 판정발급번호, HS 번호를 파싱합니다.')
+      + '<label class="fld" style="margin-top:10px">판정서 PDF 파일</label>'
+      + '<input type="file" id="cert-pdf-file" accept="application/pdf" multiple>'
+      + '<div class="hint">여러 파일을 선택하면 파일별로 파싱 결과를 보여줍니다. 모델명이 잘못 매칭되면 반영 전 수정하세요.</div>'
       + '<div id="cert-parse-out" style="margin-top:12px"></div>'
       + '</div></details>';
     next.insertAdjacentHTML('beforebegin',html);
@@ -45,7 +51,7 @@
     var inp=document.getElementById('cert-pdf-file');
     if(!inp || inp.dataset.bound) return;
     inp.dataset.bound='1';
-    inp.addEventListener('change',function(){ if(inp.files&&inp.files[0]) parseFile(inp.files[0]); });
+    inp.addEventListener('change',function(){ if(inp.files&&inp.files.length) parseFiles(Array.from(inp.files)); });
   }
   function loadScript(src){
     return new Promise(function(resolve,reject){
@@ -140,86 +146,99 @@
     for(var i=0;i<pats.length;i++){var m=String(text).match(pats[i]); if(m) return m[1];}
     return '';
   }
-  function parseCertText(text,targetModel){
+  function parseCertText(text,fileName){
     var ls=lines(text);
     var status=situationStatus(text);
-    if(!status.valid) return {valid:false,error:'유효한 상황허가 대상품목 판정서가 아닙니다. '+(status.reason||''),ctx:status.ctx||''};
+    if(!status.valid) return {valid:false,fileName:fileName,error:'유효한 상황허가 대상품목 판정서가 아닙니다. '+(status.reason||''),ctx:status.ctx||''};
     var item=afterLabel(ls,[/^(?:제품명|품목명|물품명|품명)\s*/i,/^(?:Name\s*of\s*Item|Item\s*Name)\s*/i]);
     var model=afterLabel(ls,[/^(?:모델명|모델)\s*/i,/^(?:Model\s*(?:Number|Name)?|Model\s*No\.?)\s*/i]);
     var hs=extractHs(text);
     var number=extractNumber(text);
-    if(!model) model=targetModel||'';
-    return {valid:true,isHae:status.status==='yes',situation:status.status==='yes'?'해당':'비해당',model:model,item:item,hs:hs,number:number,raw:text,ctx:status.ctx||''};
+    return {valid:true,fileName:fileName,isHae:status.status==='yes',situation:status.status==='yes'?'해당':'비해당',model:model,item:item,hs:hs,number:number,raw:text,ctx:status.ctx||''};
   }
-  async function parseFile(file){
+  async function parseFiles(files){
     var out=document.getElementById('cert-parse-out');
     if(!out) return;
-    var target=document.getElementById('cert-target-model')?.value || '';
-    out.innerHTML=noteLocal('info','판정서 PDF를 읽는 중입니다. 텍스트 PDF 기준으로 처리합니다.');
-    try{
-      var text=await extractPdfText(file);
-      var parsed=parseCertText(text,target);
-      if(!parsed.valid){
-        out.innerHTML=noteLocal('danger','<b>'+escLocal(parsed.error)+'</b><br><span class="small">상황허가 대상품목 행에서 해당/비해당 체크를 확인할 수 있어야 합니다.</span>');
-        return;
-      }
-      renderParsed(parsed,target);
-    }catch(e){
-      out.innerHTML=noteLocal('danger','PDF 파싱에 실패했습니다. 텍스트 PDF인지 확인해 주세요.<br><span class="small">'+escLocal(e.message||e)+'</span>');
+    out.innerHTML=noteLocal('info','판정서 PDF '+files.length+'개를 읽는 중입니다. 텍스트 PDF 기준으로 처리합니다.');
+    var results=[];
+    for(var i=0;i<files.length;i++){
+      try{ results.push(parseCertText(await extractPdfText(files[i]),files[i].name)); }
+      catch(e){ results.push({valid:false,fileName:files[i].name,error:'PDF 파싱에 실패했습니다. 텍스트 PDF인지 확인해 주세요. '+(e.message||e)}); }
     }
+    renderBatch(results);
   }
   function fieldHtml(id,label,val){
     return '<div><label class="fld">'+escLocal(label)+'</label><input type="text" id="'+id+'" value="'+escLocal(val||'')+'"></div>';
   }
-  function renderParsed(p,target){
+  function renderBatch(results){
     var out=document.getElementById('cert-parse-out');
     if(!out) return;
-    out.innerHTML=noteLocal(p.isHae?'warn':'ok','판정서에서 상황허가 대상품목 <b>'+escLocal(p.situation)+'</b>으로 확인했습니다. 아래 값을 확인 후 반영하세요.')
-      + '<div class="cert-grid">'
-      + fieldHtml('cert-situation','상황허가 대상품목 해당 여부',p.situation)
-      + fieldHtml('cert-model','모델명',p.model||target)
-      + fieldHtml('cert-item','제품명/물품명',p.item)
-      + fieldHtml('cert-hs','HS 번호',p.hs)
-      + fieldHtml('cert-number','판정발급번호',p.number)
-      + '</div>'
-      + '<div class="cert-actions"><button type="button" class="btn primary" id="cert-apply">이 정보로 반영하고 다음 단계로 이동</button></div>';
-    document.getElementById('cert-apply').onclick=function(){
-      var data={
-        isHae:p.isHae,
-        model:document.getElementById('cert-model').value.trim() || target,
-        item:document.getElementById('cert-item').value.trim(),
-        hs:digits(document.getElementById('cert-hs').value).slice(0,10),
-        number:document.getElementById('cert-number').value.trim()
-      };
-      applyParsed(data,target);
-    };
+    var valid=results.filter(function(r){return r.valid;});
+    var html=noteLocal(valid.length===results.length?'ok':'warn','PDF '+results.length+'개 중 <b>'+valid.length+'개</b>를 유효한 상황허가 대상품목 판정서로 파싱했습니다. 반영 전 파일별 값을 확인하세요.');
+    results.forEach(function(p,i){
+      html+='<div class="cert-file-card"><div class="cert-file-title">'+escLocal(i+1+'. '+(p.fileName||'판정서 PDF'))+'</div>';
+      if(!p.valid){
+        html+=noteLocal('danger','<b>'+escLocal(p.error||'유효한 상황허가 대상품목 판정서가 아닙니다.')+'</b><br><span class="small">상황허가 대상품목 행에서 해당/비해당 체크를 확인할 수 있어야 합니다.</span>')+'</div>';
+        return;
+      }
+      html+=noteLocal(p.isHae?'warn':'ok','상황허가 대상품목 <b>'+escLocal(p.situation)+'</b>으로 확인했습니다.')
+        + '<div class="cert-grid">'
+        + '<div><label class="fld">적용할 모델</label>'+modelSelectHtml('cert-target-'+i,p.model||currentModelOptions()[i]||'')+'</div>'
+        + fieldHtml('cert-situation-'+i,'상황허가 대상품목 해당 여부',p.situation)
+        + fieldHtml('cert-model-'+i,'모델명',p.model)
+        + fieldHtml('cert-item-'+i,'제품명/물품명',p.item)
+        + fieldHtml('cert-hs-'+i,'HS 번호',p.hs)
+        + fieldHtml('cert-number-'+i,'판정발급번호',p.number)
+        + '</div></div>';
+    });
+    if(valid.length){ html+='<div class="cert-actions"><button type="button" class="btn primary" id="cert-apply-all">유효 판정서 전체 반영</button></div>'; }
+    out.innerHTML=html;
+    var btn=document.getElementById('cert-apply-all');
+    if(btn){ btn.onclick=function(){ applyBatch(results); }; }
   }
-  function applyParsed(p,target){
-    var idx=(state.lookups||[]).findIndex(function(x){return String(x.model||'')===String(target||p.model||'');});
+  function applyOne(p,i){
+    var target=document.getElementById('cert-target-'+i)?.value.trim() || p.model || '';
+    var data={
+      isHae:!!p.isHae,
+      model:document.getElementById('cert-model-'+i)?.value.trim() || target,
+      item:document.getElementById('cert-item-'+i)?.value.trim() || '',
+      hs:digits(document.getElementById('cert-hs-'+i)?.value||p.hs).slice(0,10),
+      number:document.getElementById('cert-number-'+i)?.value.trim() || ''
+    };
+    var idx=(state.lookups||[]).findIndex(function(x){return String(x.model||'')===String(target||data.model||'');});
+    if(idx<0 && data.model) idx=(state.lookups||[]).findIndex(function(x){return String(x.model||'')===String(data.model);});
     if(idx<0){ state.lookups=state.lookups||[]; idx=state.lookups.length; }
     var old=state.lookups[idx]||{};
     state.lookups[idx]={
-      model:p.model||target||old.model||'',
-      item:p.item||old.item||'',
-      hs:p.hs||old.hs||'',
+      model:data.model||target||old.model||'',
+      item:data.item||old.item||'',
+      hs:data.hs||old.hs||'',
       spec:old.spec||'',
-      result:p.isHae?'해당':'비해당',
-      number:p.number||old.number||'',
+      result:data.isHae?'해당':'비해당',
+      number:data.number||old.number||'',
       detDate:old.detDate||'',
       expiry:old.expiry||'',
       type:'판정서 PDF',
-      isHae:!!p.isHae,
+      isHae:!!data.isHae,
       expired:false,
       row:{},
       found:true,
       source:'판정서 PDF'
     };
-    if(Array.isArray(state.models) && p.model && !state.models.includes(p.model)) state.models.push(p.model);
+    if(Array.isArray(state.models) && data.model && !state.models.includes(data.model)) state.models.push(data.model);
+    return state.lookups[idx];
+  }
+  function applyBatch(results){
+    var applied=[];
+    results.forEach(function(p,i){ if(p.valid) applied.push(applyOne(p,i)); });
     if(typeof save==='function') save();
     if(typeof renderResults==='function') renderResults();
     setTimeout(function(){
-      if(p.isHae){ if(typeof buildException==='function') buildException(); if(typeof show==='function') show('#card-exception'); }
-      else{ if(typeof buildScreen==='function') buildScreen(); if(typeof show==='function') show('#card-screen'); }
+      var hasHae=applied.some(function(x){return x.isHae;});
+      var hasNon=applied.some(function(x){return !x.isHae;});
+      if(hasHae && !hasNon){ if(typeof buildException==='function') buildException(); if(typeof show==='function') show('#card-exception'); }
+      else if(hasNon && !hasHae){ if(typeof buildScreen==='function') buildScreen(); if(typeof show==='function') show('#card-screen'); }
+      else{ if(typeof show==='function') show('#card-results'); }
     },60);
   }
   function patchRenderResults(){
