@@ -7,7 +7,12 @@
   function validPrevTarget(sel){
     return ['#card-input','#card-results','#card-classify','#card-exception','#card-prenotif','#card-screen'].includes(sel);
   }
+  function rememberNormal(sel){
+    if(validPrevTarget(sel)) document.body.dataset.lastNormalCard=sel;
+  }
   function fallbackSummaryPrev(){
+    var last=document.body.dataset.lastNormalCard||'';
+    if(validPrevTarget(last)) return last;
     if(state.screened) return '#card-screen';
     if(state.classifyDoc) return '#card-classify';
     if(state.exceptionChoice) return '#card-exception';
@@ -47,7 +52,9 @@
     var old=show;
     show=function(card){
       var from=currentCardSelector();
+      rememberNormal(from);
       if(card==='#card-summary' && validPrevTarget(from)) document.body.dataset.lastSummarySource=from;
+      if(validPrevTarget(card)) rememberNormal(card);
       if(card==='#card-prenotif' && document.body.dataset.prenotifDocVisible!=='1') hidePrenotifDoc();
       old.apply(this,arguments);
       if(card==='#card-prenotif' && document.body.dataset.prenotifDocVisible!=='1') setTimeout(hidePrenotifDoc,30);
@@ -56,14 +63,27 @@
     show.__backNavPatch=true;
   }
   function install(){
-    patchShow(); addButtons();
+    patchShow();
+    rememberNormal(currentCardSelector());
+    addButtons();
     if(!document.body.dataset.prevStepBound){
       document.body.dataset.prevStepBound='1';
       document.addEventListener('click',function(e){
         var summaryBtn=e.target&&e.target.closest?e.target.closest('#go-summary,#cl-summary,#ex-summary,#pn-continue-flow,#btn-screen-next'):null;
         if(summaryBtn){
           var from=currentCardSelector();
-          if(validPrevTarget(from)) document.body.dataset.lastSummarySource=from;
+          if(validPrevTarget(from)){
+            document.body.dataset.lastSummarySource=from;
+            rememberNormal(from);
+          }
+        }
+      },true);
+      document.addEventListener('click',function(e){
+        var step=e.target&&e.target.closest?e.target.closest('#stepper button[data-card]'):null;
+        if(step){
+          var from=currentCardSelector();
+          rememberNormal(from);
+          if(step.dataset.card==='#card-summary' && validPrevTarget(from)) document.body.dataset.lastSummarySource=from;
         }
       },true);
       document.addEventListener('click',function(e){
