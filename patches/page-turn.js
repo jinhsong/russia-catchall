@@ -5,7 +5,8 @@
     var css=''
       + '.wrap{position:relative;overflow-x:hidden;overflow-y:visible}'
       + '.card{will-change:transform,opacity;transform-origin:center right}'
-      + 'body.page-turning .card{pointer-events:none}'
+      + 'body.page-turning .card,body.page-turning #stepper,body.page-turning .btn{pointer-events:none!important}'
+      + 'body.page-turning{cursor:progress}'
       + '.card.page-turn-current{display:block!important;animation:pageTurnOutLeft .26s cubic-bezier(.22,.61,.36,1) both}'
       + '.card.page-turn-next{display:block!important;animation:pageTurnInRight .30s cubic-bezier(.22,.61,.36,1) both}'
       + '.card.page-turn-current.back{animation-name:pageTurnOutRight;transform-origin:center left}'
@@ -33,7 +34,9 @@
   function wrapShow(){
     if(typeof show!=='function' || show.__pageTurnPreview) return;
     var original=show;
+    var turning=false;
     var wrapped=function(card){
+      if(turning || document.body.classList.contains('page-turning')) return;
       var target=document.querySelector(card);
       var current=currentCard();
       if(!target || !current || current===target || window.matchMedia('(prefers-reduced-motion: reduce)').matches){
@@ -41,6 +44,7 @@
       }
       var curSel=idSel(current), nextSel=card;
       var isBack=cardIndex(nextSel) < cardIndex(curSel);
+      turning=true;
       document.body.classList.add('page-turning');
       current.classList.remove('page-turn-current','page-turn-next','back');
       target.classList.remove('page-turn-current','page-turn-next','back','hide');
@@ -48,10 +52,13 @@
       target.classList.add('page-turn-next');
       if(isBack){current.classList.add('back'); target.classList.add('back');}
       setTimeout(function(){
-        original.call(null,card);
-        current.classList.remove('page-turn-current','page-turn-next','back');
-        target.classList.remove('page-turn-current','page-turn-next','back');
-        document.body.classList.remove('page-turning');
+        try{ original.call(null,card); }
+        finally{
+          current.classList.remove('page-turn-current','page-turn-next','back');
+          target.classList.remove('page-turn-current','page-turn-next','back');
+          document.body.classList.remove('page-turning');
+          turning=false;
+        }
       },310);
     };
     wrapped.__pageTurnPreview=true;
