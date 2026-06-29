@@ -38,10 +38,10 @@
     if(old) old.remove();
     var html='<details id="cert-upload-panel" class="mcard"><summary>판정서 PDF 첨부로 판정정보 불러오기</summary>'
       + '<div class="mbody">'
-      + noteLocal('info','<b>판정서를 가지고 있는 경우 여기에 첨부해주시기 바랍니다.</b><br>여러 모델의 판정서 PDF를 한 번에 업로드할 수 있습니다. 텍스트 PDF에서 상황허가 대상품목 해당 여부, 모델명, 제품명/물품명, 판정발급번호, HS 번호를 파싱합니다.')
+      + noteLocal('info','<b>판정 DB에 없는 경우, 보유 중인 판정서 PDF를 첨부해 판정정보를 불러올 수 있습니다.</b><br>DB 조회 결과가 없거나 최신 DB에 아직 반영되지 않은 모델에 사용하세요. 여러 모델의 판정서 PDF를 한 번에 업로드할 수 있습니다.<br>텍스트 PDF에서 상황허가 대상품목 해당 여부, 모델명, 제품명/물품명, 판정발급번호, HS 번호를 파싱합니다.')
       + '<label class="fld" style="margin-top:10px">판정서 PDF 파일</label>'
       + '<input type="file" id="cert-pdf-file" accept="application/pdf" multiple>'
-      + '<div class="hint">여러 파일을 선택하면 파일별로 파싱 결과를 보여줍니다. 모델명이 잘못 매칭되면 반영 전 수정하세요.</div>'
+      + '<div class="hint">여러 파일을 선택하면 파일별로 파싱 결과를 보여줍니다. 입력 모델과 다른 경우 반영 전 수정하세요.</div>'
       + '<div id="cert-parse-out" style="margin-top:12px"></div>'
       + '</div></details>';
     next.insertAdjacentHTML('beforebegin',html);
@@ -183,7 +183,7 @@
       }
       html+=noteLocal(p.isHae?'warn':'ok','상황허가 대상품목 <b>'+escLocal(p.situation)+'</b>으로 확인했습니다.')
         + '<div class="cert-grid">'
-        + '<div><label class="fld">적용할 모델</label>'+modelSelectHtml('cert-target-'+i,p.model||currentModelOptions()[i]||'')+'</div>'
+        + '<div><label class="fld">적용할 입력 모델</label>'+modelSelectHtml('cert-target-'+i,p.model||currentModelOptions()[i]||'')+'</div>'
         + fieldHtml('cert-situation-'+i,'상황허가 대상품목 해당 여부',p.situation)
         + fieldHtml('cert-model-'+i,'모델명',p.model)
         + fieldHtml('cert-item-'+i,'제품명/물품명',p.item)
