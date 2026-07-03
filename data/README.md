@@ -8,7 +8,8 @@
 |---|---|---|
 | 자가판정결과 | `data/self.xlsx` (헤더 2행) | `data/self_classification.csv` |
 | 전문판정결과 | `data/expert.xlsx` (헤더 2행) | `data/expert_classification.csv` |
-| 키워드-HS 마스터 | — | `data/keyword_hs.csv` |
+| 키워드-HS 추천 | — | `data/keyword_hs.csv` |
+| HSK 품목표(관세청 HS부호) | `data/hsk_master.xlsx` (헤더 1행) | `data/hsk_master.csv` |
 | 대러 제재대상 품목(HS) | — | `data/russia_sanctions_hs.csv` |
 | 사전신고 대상(HS) | — | `data/prenotification_hs.csv` |
 
@@ -32,9 +33,23 @@
 
 컬럼명은 위 표기 외에 일부 별칭(`모델명`, `HS코드`, `판정결과` 등)도 인식하지만, 가급적 표준 컬럼명을 유지하세요.
 
+### hsk_master.csv — HSK 10자리 전체 품목표 (입력 허용 HS의 기준)
+
+`HS부호,한글품목명` — **한국 HSK 10단위 전체 목록**을 넣는 파일입니다. 여기에 등록된 HS만 판정 신청 시 직접입력이 허용되고, 한글품목명은 제품명 입력 시 HS 추천에도 활용됩니다. (현재 파일은 샘플 4행)
+
+**데이터 출처 (관세청 공식, 무료·로그인 불필요):**
+
+1. **공공데이터포털 — 관세청_HS부호** (추천): <https://www.data.go.kr/data/15049722/fileData.do>
+   - CSV 파일로 제공되며 `HS부호`(10자리), `한글품목명`, `영문품목명` 등의 컬럼 포함. **컬럼명이 이 도구가 인식하는 이름과 같아서, 다운로드한 CSV를 `data/hsk_master.csv`로 이름만 바꿔 올리면 됩니다.**
+   - 매년 개정(1월 1일 기준) 시 신규 파일이 올라오므로 연 1회 교체하세요.
+2. 공공데이터포털 — 관세청_HS부호 단위별 품목명: <https://www.data.go.kr/data/15130660/fileData.do> (2/4/6/10단위 계층 포함 버전)
+3. 관세법령정보포털(CLIP) 세계HS > 관세율표: <https://unipass.customs.go.kr/clip/index.do> (엑셀 다운로드 → `data/hsk_master.xlsx`로 저장, 헤더 1행 기준)
+
+인식하는 HS 컬럼명: `HS부호`, `HS코드`, `HSKCD`, `품목번호`, `세번부호` / 품목명 컬럼명: `한글품목명`, `한글품명`, `품명`, `품목설명`. 이 중 하나와 일치하면 별도 가공 없이 동작합니다.
+
 ### keyword_hs.csv (키워드 → HS 추천)
 
-`키워드,HS코드,품목설명` — 판정 신청 시 제품명 입력에 따라 HS 10자리를 추천하는 데 사용. **HS 직접입력도 이 파일들에 등록된 10자리만 허용**되므로, 실제 사용하는 HS는 반드시 등록돼 있어야 합니다.
+`키워드,HS코드,품목설명` — 판정 신청 시 제품명 입력에 따라 HS 10자리를 우선 추천하는 데 사용합니다. HSK 품목표의 공식 품목명은 딱딱해서 실무 용어(예: "스마트폰")와 안 맞을 수 있으므로, 자주 쓰는 품목은 여기에 실무 키워드로 등록해 두면 추천 정확도가 올라갑니다.
 
 ### russia_sanctions_hs.csv / prenotification_hs.csv
 

@@ -1,0 +1,12 @@
+{
+  "name": "russia-catchall",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "test": "node tests/smoke.mjs",
+    "test:headed": "HEADED=1 node tests/smoke.mjs"
+  },
+  "devDependencies": {
+    "playwright": "^1.49.0"
+  }
+}
