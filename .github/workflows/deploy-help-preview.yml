@@ -25,6 +25,20 @@ jobs:
       - name: Checkout preview branch
         uses: actions/checkout@v4
 
+      - name: Fix preview body injection
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+
+          p = Path('russia-catchall-help-preview-v2.html')
+          s = p.read_text(encoding='utf-8')
+          old = "src=src.replace('</body>',modalHtml+scriptTag+'</body>');"
+          new = "const bodyClose=src.lastIndexOf('</body>');if(bodyClose<0)throw new Error('body close tag not found');src=src.slice(0,bodyClose)+modalHtml+scriptTag+src.slice(bodyClose);"
+          if old not in s:
+              raise SystemExit('target line not found')
+          p.write_text(s.replace(old, new, 1), encoding='utf-8')
+          PY
+
       - name: Configure GitHub Pages
         uses: actions/configure-pages@v5
         with:
