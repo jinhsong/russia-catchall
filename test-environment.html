@@ -1,0 +1,156 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; connect-src 'self'; object-src 'none'; base-uri 'none'">
+<title>러시아·벨라루스 수출 점검 테스트</title>
+<style>
+:root{--ink:#15243d;--soft:#33445f;--paper:#f4f1e9;--panel:#faf8f2;--line:#d9d2c2;--copper:#9a6a32;--green:#2f6b3c;--greenbg:#e6efe7;--red:#9c2b25;--redbg:#f4e2df;--amber:#9a6b16;--amberbg:#f6edd6;--blue:#1f5b8f;--bluebg:#e7eef5;--shadow:0 8px 26px rgba(21,36,61,.09)}
+*{box-sizing:border-box}body{margin:0;background:radial-gradient(900px 500px at 90% -10%,rgba(154,106,50,.08),transparent 60%),var(--paper);color:var(--ink);font-family:"Malgun Gothic","Apple SD Gothic Neo",sans-serif;line-height:1.6}.wrap{max-width:1020px;margin:0 auto;padding:34px 22px 80px}.hero{background:var(--ink);color:#fff;border-radius:18px;padding:30px 32px;box-shadow:var(--shadow)}.eyebrow{color:#d8b77c;font-size:12px;font-weight:800;letter-spacing:.16em}.hero h1{font-size:27px;margin:8px 0}.hero p{margin:0;color:#d8deea;max-width:760px}.hero-actions{display:flex;gap:10px;flex-wrap:wrap;margin-top:22px}.btn{display:inline-flex;align-items:center;justify-content:center;border:1px solid #c4bba6;border-radius:10px;background:#fff;color:var(--ink);padding:10px 16px;font-size:13px;font-weight:800;text-decoration:none;cursor:pointer}.btn.primary{background:#b98a4d;border-color:#b98a4d;color:#fff}.btn.ghost{background:transparent;border-color:#6f7b90;color:#fff}.status-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px;margin:18px 0}.status{background:var(--panel);border:1px solid var(--line);border-radius:13px;padding:15px}.status .k{font-size:11px;color:#6c6354}.status .v{font-size:16px;font-weight:800;margin-top:4px}.status.ok{background:var(--greenbg);color:var(--green)}.status.bad{background:var(--redbg);color:var(--red)}.card{background:var(--panel);border:1px solid var(--line);border-radius:15px;padding:22px;margin:16px 0;box-shadow:0 1px 2px rgba(21,36,61,.05)}.card h2{font-size:18px;margin:0 0 5px}.sub{font-size:13px;color:#6c6354;margin:0 0 16px}.tests{display:grid;gap:12px}.test{background:#fff;border:1px solid var(--line);border-radius:13px;padding:17px}.test-head{display:flex;gap:12px;align-items:flex-start}.test input[type=checkbox]{width:20px;height:20px;margin-top:3px;accent-color:var(--green)}.test h3{font-size:15px;margin:0}.test .purpose{font-size:12px;color:#6c6354;margin-top:2px}.steps{margin:12px 0 0;padding-left:22px;font-size:13px;color:var(--soft)}.steps li{margin:5px 0}.expected{margin-top:11px;border-left:4px solid var(--green);background:var(--greenbg);border-radius:0 8px 8px 0;padding:9px 12px;font-size:12.5px;color:var(--green)}code{background:#ece8df;border-radius:5px;padding:2px 5px}.asset-list{display:grid;grid-template-columns:1fr 1fr;gap:7px}.asset{display:flex;justify-content:space-between;gap:10px;border-bottom:1px solid var(--line);padding:7px 0;font-size:12.5px}.pass{color:var(--green);font-weight:800}.fail{color:var(--red);font-weight:800}.toolbar{display:flex;justify-content:space-between;gap:10px;align-items:center;flex-wrap:wrap;margin-top:16px}.progress{font-size:13px;font-weight:800;color:var(--blue)}.note{border:1px solid #d9c89e;background:var(--amberbg);color:var(--amber);border-radius:10px;padding:11px 13px;font-size:12.5px}.footer{text-align:center;color:#6c6354;font-size:12px;margin-top:28px}@media(max-width:700px){.wrap{padding:18px 13px 60px}.hero{padding:23px 20px}.hero h1{font-size:23px}.status-grid{grid-template-columns:1fr}.asset-list{grid-template-columns:1fr}.hero-actions .btn{width:100%}}
+</style>
+</head>
+<body>
+<main class="wrap">
+  <section class="hero">
+    <div class="eyebrow">MANUAL TEST</div>
+    <h1>러시아·벨라루스 수출 점검 테스트</h1>
+    <p>사용자가 제도를 몰라도 화면 안내만 따라갈 수 있는지 확인합니다. 아래 순서대로 진행하고 통과한 항목을 체크하세요.</p>
+    <div class="hero-actions">
+      <a class="btn primary" href="index.html" target="_blank" rel="noopener">테스트 앱 새 창에서 열기</a>
+      <button class="btn ghost" id="reset-progress" type="button">체크 결과 초기화</button>
+    </div>
+  </section>
+
+  <section class="status-grid">
+    <div class="status" id="server-status"><div class="k">테스트 서버</div><div class="v">확인 중</div></div>
+    <div class="status" id="asset-status"><div class="k">필수 파일</div><div class="v">확인 중</div></div>
+    <div class="status"><div class="k">권장 브라우저</div><div class="v">Chrome / Edge</div></div>
+  </section>
+
+  <section class="card">
+    <h2>환경 상태</h2>
+    <p class="sub">HTML과 필수 CSV가 모두 응답해야 정상적인 판정 테스트가 가능합니다.</p>
+    <div class="asset-list" id="asset-list"></div>
+  </section>
+
+  <section class="card">
+    <h2>기능 점검 체크리스트</h2>
+    <p class="sub">각 테스트는 앱을 새로고침한 뒤 시작하면 결과를 비교하기 쉽습니다.</p>
+    <div class="note">실제 업무정보는 입력하지 말고 아래 샘플 값만 사용하세요. 체크 상태는 이 브라우저에만 저장됩니다.</div>
+    <div class="tests" id="tests">
+      <article class="test">
+        <div class="test-head"><input type="checkbox" data-test="sample"><div><h3>1. 샘플 모델 자동입력</h3><div class="purpose">드롭다운·DB 자동 연동</div></div></div>
+        <ol class="steps"><li>수출품목 입력에서 <code>SM-S928N</code>을 입력하거나 목록에서 선택합니다.</li><li>제품명과 HS Code를 수정해 봅니다.</li><li>‘자동 확인 내용’을 펼칩니다.</li></ol>
+        <div class="expected">예상: 제품명과 HS Code가 자동 입력되고 수정할 수 없음. 화면에는 ‘품목 확인이 완료되었습니다’가 표시되고 상세 정보는 접힌 영역에만 표시됨</div>
+      </article>
+      <article class="test">
+        <div class="test-head"><input type="checkbox" data-test="clear"><div><h3>2. 모델 변경 시 자동입력 초기화</h3><div class="purpose">이전 모델 데이터 잔존 방지</div></div></div>
+        <ol class="steps"><li><code>SM-S928N</code> 선택 후 모델명을 <code>UNKNOWN-MODEL</code>로 바꿉니다.</li><li>제품명과 HS Code를 확인합니다.</li></ol>
+        <div class="expected">예상: 이전 제품명·HS·자동 확인 내용이 모두 사라지고 직접 입력할 수 있음</div>
+      </article>
+      <article class="test">
+        <div class="test-head"><input type="checkbox" data-test="exact"><div><h3>3. 모델명 완전 일치 조회</h3><div class="purpose">부분 문자열 오판정 방지</div></div></div>
+        <ol class="steps"><li>모델명에 <code>SM</code> 또는 <code>SM-S928N-X</code>를 입력합니다.</li><li>기존 SM-S928N 판정이 자동 선택되지 않는지 확인합니다.</li></ol>
+        <div class="expected">예상: 기존 모델 정보가 자동 입력되지 않음. 정확히 일치한 모델만 자료와 연결됨</div>
+      </article>
+      <article class="test">
+        <div class="test-head"><input type="checkbox" data-test="judgment"><div><h3>4. 추가 확인 품목 경로</h3><div class="purpose">불필요한 거래정보 입력 생략</div></div></div>
+        <ol class="steps"><li><code>UNKNOWN-MODEL</code>, 제품명 <code>테스트 장비</code>, HS <code>9999999999</code>를 입력합니다.</li><li>나타난 사양과 용도를 입력하고 다음을 누릅니다.</li><li>모든 확인 질문에 답한 뒤 결과와 문서를 확인합니다.</li></ol>
+        <div class="expected">예상: 거래정보 입력을 건너뛰어 확인 질문으로 이동. 해야 할 일에는 판정 요청 안내가, 문서 만들기에는 판정 요청 문서가 표시됨. 만료 품목은 비고에 ‘판정 유효기간 만료’와 만료된 판정번호가 함께 표시됨</div>
+      </article>
+      <article class="test">
+        <div class="test-head"><input type="checkbox" data-test="trade"><div><h3>5. 거래정보와 복수 인보이스</h3><div class="purpose">자동 확인 품목의 정상 경로</div></div></div>
+        <ol class="steps"><li><code>SM-S928N</code>을 선택하고 다음을 누릅니다.</li><li>거래 유형을 선택한 뒤 거래정보 화면으로 이동합니다.</li><li>목적국을 러시아로 선택합니다.</li><li>구매자·최종수하인·최종사용자에서 SERC, SRR, 기타를 각각 확인하고 기타 이름을 입력합니다.</li><li>목적국을 벨라루스로 바꿉니다.</li></ol>
+        <div class="expected">예상: 유형 선택 단계에서 앞서 입력한 품목별 적용 유형과 추가질문을 받음. 전시회와 수리 유형을 함께 선택해도 재수입·폐기 질문은 한 번만 표시되며, 소비자 통신제품과 반송을 함께 선택하면 소비자 통신제품 우선 검토를 권장함. 인보이스 단계에는 선택 결과만 요약됨</div>
+      </article>
+      <article class="test">
+        <div class="test-head"><input type="checkbox" data-test="none"><div><h3>6. ‘해당 없음’ 경로</h3><div class="purpose">불필요한 질문 생략</div></div></div>
+        <ol class="steps"><li><code>SM-S928N</code>으로 거래정보 입력까지 이동합니다.</li><li>‘어느 항목에도 해당하지 않음’을 선택합니다.</li><li>구매자·최종수하인·최종사용자·최종사용용도·수출예정일을 입력하고 다음을 누릅니다.</li></ol>
+        <div class="expected">예상: 5개 문의정보가 모두 필수로 검증되고 확인 질문을 생략함. 해야 할 일과 결과보고서에 입력정보를 기재하여 HTML 파일과 함께 통상그룹에 문의하라는 안내가 표시됨</div>
+      </article>
+      <article class="test">
+        <div class="test-head"><input type="checkbox" data-test="numbers"><div><h3>7. 누락·숫자 입력 오류</h3><div class="purpose">팝업 대신 화면 안에서 안내</div></div></div>
+        <ol class="steps"><li>거래정보에서 필수 항목을 비우고 다음을 누릅니다.</li><li>수량 <code>0</code>, <code>-1</code>, <code>1.5</code>와 유상 단가 <code>0</code>을 각각 입력해 봅니다.</li></ol>
+        <div class="expected">예상: 다음 화면으로 이동하지 않고 누락·오류 항목이 거래정보 화면 안에 목록으로 표시됨</div>
+      </article>
+      <article class="test">
+        <div class="test-head"><input type="checkbox" data-test="invalidate"><div><h3>8. 이전 단계 수정과 결과 파일</h3><div class="purpose">오래된 결과 재사용 방지</div></div></div>
+        <ol class="steps"><li>해야 할 일까지 완료한 뒤 결과보고서를 내려받습니다.</li><li>문서 만들기로 이동해 같은 다운로드 버튼이 있는지 확인합니다.</li><li>상단 수출품목 입력으로 돌아가 모델 또는 HS를 바꿉니다.</li></ol>
+        <div class="expected">예상: 해야 할 일과 문서 만들기 두 화면에서 HTML 결과보고서를 내려받을 수 있음. 상위 입력을 바꾸면 뒤 단계가 잠기고 이전 결과를 재사용할 수 없음</div>
+      </article>
+      <article class="test">
+        <div class="test-head"><input type="checkbox" data-test="serc-flags"><div><h3>9. SERC/SRR 확인 질문 자동입력</h3><div class="purpose">11번 재수출 질문만 수동 확인</div></div></div>
+        <ol class="steps"><li>러시아 인보이스의 구매자·최종수하인·최종사용자를 모두 SERC 또는 SRR로 선택합니다.</li><li>거래정보를 완료하고 확인 질문으로 이동합니다.</li></ol>
+        <div class="expected">예상: SERC와 SRR은 CSL 비교에서 제외됨. 1~10번과 12~14번은 ‘아니오’로 자동 선택되고 수정할 수 없으며, 11번만 사용자가 예 또는 아니오를 선택함. 11번을 ‘예’로 선택해도 세 거래자가 모두 SERC/SRR이면 품의가 생성되고 해당 의심징후가 품의에 표시됨</div>
+      </article>
+      <article class="test">
+        <div class="test-head"><input type="checkbox" data-test="block"><div><h3>10. 수동 ‘예’와 키워드 경로 구분</h3><div class="purpose">이상 항목만 의심징후에 표시</div></div></div>
+        <ol class="steps"><li>확인 질문에서 ‘모두 아니오 선택’을 눌러 전체가 선택되는지 확인합니다.</li><li>질문 하나를 ‘예’로 바꾸고 결과를 확인합니다.</li><li>별도 테스트에서 최종사용자에 <code>Ministry of Defence</code>, 최종사용용도에 <code>armoured missile guidance</code>를 입력하고 질문은 모두 아니오로 완료합니다.</li></ol>
+        <div class="expected">예상: 사용자가 직접 ‘예’를 선택하면 통상그룹 문의 대상으로 처리됨. 키워드만 발견되면 품의가 생성되고 의심징후 검토에 발견 건수만 표시되며, 상세 키워드는 결과보고서에서 확인함. 이상 항목이 없으면 ‘이상 없음’으로 표시됨</div>
+      </article>
+      <article class="test">
+        <div class="test-head"><input type="checkbox" data-test="csl"><div><h3>11. CSL Jaro–Winkler 유사 일치</h3><div class="purpose">구매자·최종수하인·최종사용자 자동 스크리닝</div></div></div>
+        <ol class="steps"><li>러시아 거래자의 ‘기타’를 선택하고 한 항목에 <code>China Telecom Corp Lmt</code>를 입력합니다.</li><li>나머지 거래정보를 채우고 다음을 누릅니다.</li><li>확인 질문 13번과 최종 결과보고서를 확인합니다.</li></ol>
+        <div class="expected">예상: CSL의 CHINA TELECOM CORP LTD와 90점 이상으로 일치하고 13번이 ‘예’로 자동 표시되지만 품의는 계속 생성됨. 품의 의심징후에는 CSL 일치 O만 표시되고, 입력명·등재명·점수·출처 목록은 결과보고서에만 기록됨</div>
+      </article>
+      <article class="test">
+        <div class="test-head"><input type="checkbox" data-test="approval-table"><div><h3>12. 품의 정보 통합 표</h3><div class="purpose">품목정보와 거래정보를 한 표로 확인·복사</div></div></div>
+        <ol class="steps"><li>품의가 허용되는 테스트를 완료하고 문서 만들기로 이동합니다.</li><li>판정 요청 또는 사전신고 요청 본문의 표를 확인합니다.</li><li>‘본문·표 복사’를 눌러 Word나 메일에 붙여넣습니다.</li></ol>
+        <div class="expected">예상: 사전신고 표 No.는 인보이스 기준이고 품목별 적용 유형과 추가답변이 표시됨. 첨부는 결과보고서와 선택 유형에 필요한 서류만 번호가 부여되며 인보이스·거래관계 증빙과 모델별 판정자료는 포함되지 않음. 출시 전·출시 후·반송·전시·수리 유형에 맞는 첨부 문구가 생성됨</div>
+      </article>
+      <article class="test">
+        <div class="test-head"><input type="checkbox" data-test="back-duplicate"><div><h3>13. 이전 수정·중복 입력 회귀 테스트</h3><div class="purpose">오래된 결과와 중복 품목 차단</div></div></div>
+        <ol class="steps"><li>수출품목에 같은 모델을 대소문자만 다르게 2번 입력하고 다음을 누릅니다.</li><li>거래정보에서 같은 인보이스 번호를 2번 사용하고, 한 인보이스에 같은 모델을 2번 선택해 봅니다.</li><li>해야 할 일까지 진행한 뒤 이전 단계로 돌아가 모델·거래정보·질문을 각각 수정합니다.</li><li>CSL 확인 중에는 이전 단계 버튼을 눌러 검색 완료 후 화면이 임의로 넘어가지 않는지 확인합니다.</li></ol>
+        <div class="expected">예상: 중복 모델·중복 인보이스 번호·동일 인보이스 내 중복 품목은 다음 단계로 진행되지 않음. 이전 입력을 수정하면 뒤 단계가 다시 잠기고 이전 결과·품의가 제거되며, 오래된 CSL 결과가 덮어쓰지 않음</div>
+      </article>
+      <article class="test">
+        <div class="test-head"><input type="checkbox" data-test="scenarios"><div><h3>14. 시뮬레이션 시나리오</h3><div class="purpose">유효·만료·미등록·비제재·복수이력 분기</div></div></div>
+        <ol class="steps"><li>수출품목 입력의 ‘테스트 시나리오 불러오기’를 펼칩니다.</li><li>각 시나리오 버튼을 누르고 단계별 ‘다음’만 눌러 진행합니다.</li><li>거래정보·수량·단가·유무상·확인 질문이 자동 입력되었는지 확인합니다.</li><li>‘복수 판정이력’에서는 자동 확인 내용을 펼쳐 판정번호를 확인합니다.</li><li>‘복합 경로’에서는 거래정보를 건너뛰는지 확인합니다.</li></ol>
+        <div class="expected">예상: 39개 시나리오가 품목부터 이후 단계까지 자동 입력됨. 품목별 복수 유형, 한 품목의 복수 유형, 해당 없음 혼합, 출시 전 소비자 통신제품, 의료·전시·수리 추가질문 아니오와 기존 판정·거래·오류 경로를 재현할 수 있음</div>
+      </article>
+    </div>
+    <div class="toolbar"><div class="progress" id="progress">0 / 14 완료</div><a class="btn" href="index.html" target="_blank" rel="noopener">앱 다시 열기</a></div>
+  </section>
+  <div class="footer">러시아·벨라루스 수출 점검 · 로컬 기능 테스트 환경</div>
+</main>
+<script>
+(function(){
+  const assets=['index.html','data/self_classification.csv','data/expert_classification.csv','data/csl_names.csv'];
+  const list=document.getElementById('asset-list');
+  const server=document.getElementById('server-status');
+  const assetStatus=document.getElementById('asset-status');
+  const checks=Array.from(document.querySelectorAll('[data-test]'));
+  const storageKey='russia-catchall-test-progress-v1';
+
+  function renderProgress(){
+    const done=checks.filter(check=>check.checked).length;
+    document.getElementById('progress').textContent=`${done} / ${checks.length} 완료`;
+    localStorage.setItem(storageKey,JSON.stringify(checks.filter(check=>check.checked).map(check=>check.dataset.test)));
+  }
+
+  try{
+    const saved=new Set(JSON.parse(localStorage.getItem(storageKey)||'[]'));
+    checks.forEach(check=>check.checked=saved.has(check.dataset.test));
+  }catch(error){localStorage.removeItem(storageKey)}
+  checks.forEach(check=>check.addEventListener('change',renderProgress));
+  document.getElementById('reset-progress').addEventListener('click',()=>{checks.forEach(check=>check.checked=false);renderProgress()});
+  renderProgress();
+
+  Promise.all(assets.map(async path=>{
+    try{
+      const response=await fetch(path,{cache:'no-store'});
+      return{path,ok:response.ok,status:response.status};
+    }catch(error){return{path,ok:false,status:'연결 실패'}}
+  })).then(results=>{
+    list.innerHTML=results.map(result=>`<div class="asset"><span>${result.path}</span><span class="${result.ok?'pass':'fail'}">${result.ok?'정상':'오류 '+result.status}</span></div>`).join('');
+    const okCount=results.filter(result=>result.ok).length;
+    server.classList.add('ok');
+    server.querySelector('.v').textContent='연결됨';
+    assetStatus.classList.add(okCount===results.length?'ok':'bad');
+    assetStatus.querySelector('.v').textContent=`${okCount} / ${results.length} 정상`;
+  });
+})();
+</script>
+</body>
+</html>
