@@ -17,7 +17,7 @@
     <h1>러시아·벨라루스 수출 점검 테스트</h1>
     <p>사용자가 제도를 몰라도 화면 안내만 따라갈 수 있는지 확인합니다. 아래 순서대로 진행하고 통과한 항목을 체크하세요.</p>
     <div class="hero-actions">
-      <a class="btn primary" href="index.html" target="_blank" rel="noopener">테스트 앱 새 창에서 열기</a>
+      <a class="btn primary" href="index.html?admin=1" target="_blank" rel="noopener">관리자 테스트 앱 새 창에서 열기</a>
       <button class="btn ghost" id="reset-progress" type="button">체크 결과 초기화</button>
     </div>
   </section>
@@ -57,27 +57,27 @@
       <article class="test">
         <div class="test-head"><input type="checkbox" data-test="judgment"><div><h3>4. 추가 확인 품목 경로</h3><div class="purpose">불필요한 거래정보 입력 생략</div></div></div>
         <ol class="steps"><li><code>UNKNOWN-MODEL</code>, 제품명 <code>테스트 장비</code>, HS <code>9999999999</code>를 입력합니다.</li><li>나타난 사양과 용도를 입력하고 다음을 누릅니다.</li><li>모든 확인 질문에 답한 뒤 결과와 문서를 확인합니다.</li></ol>
-        <div class="expected">예상: 거래정보 입력을 건너뛰어 확인 질문으로 이동. 해야 할 일에는 판정 요청 안내가, 문서 만들기에는 판정 요청 문서가 표시됨. 만료 품목은 비고에 ‘판정 유효기간 만료’와 만료된 판정번호가 함께 표시됨</div>
+        <div class="expected">예상: 거래정보 입력을 건너뛰어 확인 질문으로 이동. AI 검토결과에는 통상그룹으로 판정 요청 품의를 진행하라는 안내가, 품의 초안에는 판정 요청 내용이 표시됨. 만료 품목은 비고에 ‘판정 유효기간 만료’와 만료된 판정번호가 함께 표시됨</div>
       </article>
       <article class="test">
         <div class="test-head"><input type="checkbox" data-test="trade"><div><h3>5. 거래정보와 복수 인보이스</h3><div class="purpose">자동 확인 품목의 정상 경로</div></div></div>
         <ol class="steps"><li><code>SM-S928N</code>을 선택하고 다음을 누릅니다.</li><li>거래 유형을 선택한 뒤 거래정보 화면으로 이동합니다.</li><li>목적국을 러시아로 선택합니다.</li><li>구매자·최종수하인·최종사용자에서 SERC, SRR, 기타를 각각 확인하고 기타 이름을 입력합니다.</li><li>목적국을 벨라루스로 바꿉니다.</li></ol>
-        <div class="expected">예상: 유형 선택 단계에서 앞서 입력한 품목별 적용 유형과 추가질문을 받음. 전시회와 수리 유형을 함께 선택해도 재수입·폐기 질문은 한 번만 표시되며, 소비자 통신제품과 반송을 함께 선택하면 소비자 통신제품 우선 검토를 권장함. 인보이스 단계에는 선택 결과만 요약됨</div>
+        <div class="expected">예상: 유형 선택 단계에서 앞서 입력한 각 품목에 적용 유형을 정확히 1개만 선택할 수 있음. 거래 전체에 소비자 통신제품과 반송 후보가 함께 있으면 소비자 통신제품 우선 검토를 권장하며, 인보이스 단계에는 품목별 최종 선택 결과만 요약됨</div>
       </article>
       <article class="test">
         <div class="test-head"><input type="checkbox" data-test="none"><div><h3>6. ‘해당 없음’ 경로</h3><div class="purpose">불필요한 질문 생략</div></div></div>
         <ol class="steps"><li><code>SM-S928N</code>으로 거래정보 입력까지 이동합니다.</li><li>‘어느 항목에도 해당하지 않음’을 선택합니다.</li><li>구매자·최종수하인·최종사용자·최종사용용도·수출예정일을 입력하고 다음을 누릅니다.</li></ol>
-        <div class="expected">예상: 5개 문의정보가 모두 필수로 검증되고 확인 질문을 생략함. 해야 할 일과 결과보고서에 입력정보를 기재하여 HTML 파일과 함께 통상그룹에 문의하라는 안내가 표시됨</div>
+        <div class="expected">예상: 5개 문의정보가 모두 필수로 검증되고 확인 질문을 생략함. AI 검토결과와 결과보고서에 입력정보를 기재하여 HTML 파일과 함께 통상그룹에 문의하라는 안내가 표시됨</div>
       </article>
       <article class="test">
         <div class="test-head"><input type="checkbox" data-test="numbers"><div><h3>7. 누락·숫자 입력 오류</h3><div class="purpose">팝업 대신 화면 안에서 안내</div></div></div>
-        <ol class="steps"><li>거래정보에서 필수 항목을 비우고 다음을 누릅니다.</li><li>수량 <code>0</code>, <code>-1</code>, <code>1.5</code>와 유상 단가 <code>0</code>을 각각 입력해 봅니다.</li></ol>
-        <div class="expected">예상: 다음 화면으로 이동하지 않고 누락·오류 항목이 거래정보 화면 안에 목록으로 표시됨</div>
+        <ol class="steps"><li>DB 미등록 품목에서 ‘실제 판정 완료’를 선택하고 판정발급번호에 문자 또는 9자리 숫자를 입력해 봅니다.</li><li>거래정보에서 필수 항목을 비우고 다음을 누릅니다.</li><li>수량 <code>0</code>, <code>-1</code>, <code>1.5</code>와 유상 단가 <code>0</code>을 각각 입력해 봅니다.</li></ol>
+        <div class="expected">예상: 판정발급번호는 숫자만 입력되고 정확히 10자리여야 진행됨. 거래정보의 누락·숫자 오류도 다음 화면으로 이동하지 않고 화면 안에 목록으로 표시됨</div>
       </article>
       <article class="test">
         <div class="test-head"><input type="checkbox" data-test="invalidate"><div><h3>8. 이전 단계 수정과 결과 파일</h3><div class="purpose">오래된 결과 재사용 방지</div></div></div>
-        <ol class="steps"><li>해야 할 일까지 완료한 뒤 결과보고서를 내려받습니다.</li><li>문서 만들기로 이동해 같은 다운로드 버튼이 있는지 확인합니다.</li><li>상단 수출품목 입력으로 돌아가 모델 또는 HS를 바꿉니다.</li></ol>
-        <div class="expected">예상: 해야 할 일과 문서 만들기 두 화면에서 HTML 결과보고서를 내려받을 수 있음. 상위 입력을 바꾸면 뒤 단계가 잠기고 이전 결과를 재사용할 수 없음</div>
+        <ol class="steps"><li>AI 검토결과에서 수출품목·DB 조회결과, 거래정보, 확인 질문, 키워드, CSL 결과가 모두 펼쳐져 있는지 확인합니다.</li><li>결과보고서를 내려받고 품의 초안으로 이동해 같은 다운로드 버튼이 있는지 확인합니다.</li><li>상단 수출품목 입력으로 돌아가 모델 또는 HS를 바꿉니다.</li></ol>
+        <div class="expected">예상: AI 검토결과에 사용자가 해야 할 일과 입력·조회 결과가 표로 한눈에 표시됨. 두 화면의 버튼은 ‘결과보고서(.html) 다운로드’이고, 품의가 필요한 건은 아래에 ‘(품의에 첨부 필요)’가 표시됨. 상위 입력을 바꾸면 뒤 단계가 잠김</div>
       </article>
       <article class="test">
         <div class="test-head"><input type="checkbox" data-test="serc-flags"><div><h3>9. SERC/SRR 확인 질문 자동입력</h3><div class="purpose">11번 재수출 질문만 수동 확인</div></div></div>
@@ -96,27 +96,27 @@
       </article>
       <article class="test">
         <div class="test-head"><input type="checkbox" data-test="approval-table"><div><h3>12. 품의 정보 통합 표</h3><div class="purpose">품목정보와 거래정보를 한 표로 확인·복사</div></div></div>
-        <ol class="steps"><li>품의가 허용되는 테스트를 완료하고 문서 만들기로 이동합니다.</li><li>판정 요청 또는 사전신고 요청 본문의 표를 확인합니다.</li><li>‘본문·표 복사’를 눌러 Word나 메일에 붙여넣습니다.</li></ol>
-        <div class="expected">예상: 사전신고 표 No.는 인보이스 기준이고 품목별 적용 유형과 추가답변이 표시됨. 첨부는 결과보고서와 선택 유형에 필요한 서류만 번호가 부여되며 인보이스·거래관계 증빙과 모델별 판정자료는 포함되지 않음. 출시 전·출시 후·반송·전시·수리 유형에 맞는 첨부 문구가 생성됨</div>
+        <ol class="steps"><li>품의가 허용되는 테스트를 완료하고 품의 초안으로 이동합니다.</li><li>판정 요청 또는 사전신고 요청 본문의 표를 확인합니다.</li><li>‘본문·표 복사’를 눌러 Word나 메일에 붙여넣습니다.</li></ol>
+        <div class="expected">예상: 문서는 바탕체 12포인트이며 사전신고 표 No.는 인보이스 기준임. 소비자 통신제품은 ‘소비자 통신제품(출시)’ 또는 ‘소비자 통신제품(미출시)’로 표시되고, 다른 추가 증빙 답변은 별도 열 없이 유형 아래에 표시됨. 첨부는 결과보고서와 선택 유형에 필요한 서류만 번호가 부여됨</div>
       </article>
       <article class="test">
         <div class="test-head"><input type="checkbox" data-test="back-duplicate"><div><h3>13. 이전 수정·중복 입력 회귀 테스트</h3><div class="purpose">오래된 결과와 중복 품목 차단</div></div></div>
-        <ol class="steps"><li>수출품목에 같은 모델을 대소문자만 다르게 2번 입력하고 다음을 누릅니다.</li><li>거래정보에서 같은 인보이스 번호를 2번 사용하고, 한 인보이스에 같은 모델을 2번 선택해 봅니다.</li><li>해야 할 일까지 진행한 뒤 이전 단계로 돌아가 모델·거래정보·질문을 각각 수정합니다.</li><li>CSL 확인 중에는 이전 단계 버튼을 눌러 검색 완료 후 화면이 임의로 넘어가지 않는지 확인합니다.</li></ol>
+        <ol class="steps"><li>수출품목에 같은 모델을 대소문자만 다르게 2번 입력하고 다음을 누릅니다.</li><li>거래정보에서 같은 인보이스 번호를 2번 사용하고, 한 인보이스에 같은 모델을 2번 선택해 봅니다.</li><li>AI 검토결과까지 진행한 뒤 이전 단계로 돌아가 모델·거래정보·질문을 각각 수정합니다.</li><li>CSL 확인 중에는 이전 단계 버튼을 눌러 검색 완료 후 화면이 임의로 넘어가지 않는지 확인합니다.</li></ol>
         <div class="expected">예상: 중복 모델·중복 인보이스 번호·동일 인보이스 내 중복 품목은 다음 단계로 진행되지 않음. 이전 입력을 수정하면 뒤 단계가 다시 잠기고 이전 결과·품의가 제거되며, 오래된 CSL 결과가 덮어쓰지 않음</div>
       </article>
       <article class="test">
         <div class="test-head"><input type="checkbox" data-test="scenarios"><div><h3>14. 시뮬레이션 시나리오</h3><div class="purpose">유효·만료·미등록·비제재·복수이력 분기</div></div></div>
-        <ol class="steps"><li>수출품목 입력의 ‘테스트 시나리오 불러오기’를 펼칩니다.</li><li>각 시나리오 버튼을 누르고 단계별 ‘다음’만 눌러 진행합니다.</li><li>거래정보·수량·단가·유무상·확인 질문이 자동 입력되었는지 확인합니다.</li><li>‘복수 판정이력’에서는 자동 확인 내용을 펼쳐 판정번호를 확인합니다.</li><li>‘복합 경로’에서는 거래정보를 건너뛰는지 확인합니다.</li></ol>
-        <div class="expected">예상: 39개 시나리오가 품목부터 이후 단계까지 자동 입력됨. 품목별 복수 유형, 한 품목의 복수 유형, 해당 없음 혼합, 출시 전 소비자 통신제품, 의료·전시·수리 추가질문 아니오와 기존 판정·거래·오류 경로를 재현할 수 있음</div>
+        <ol class="steps"><li><code>index.html?admin=1</code> 관리자 주소로 앱을 엽니다.</li><li>수출품목 입력의 ‘관리자 테스트 시나리오’를 펼칩니다.</li><li>각 시나리오 버튼을 누르고 단계별 ‘다음’만 눌러 진행합니다.</li><li>거래정보·수량·단가·유무상·확인 질문이 자동 입력되었는지 확인합니다.</li><li>‘복수 판정이력’에서는 자동 확인 내용을 펼쳐 판정번호를 확인합니다.</li><li>‘복합 경로’에서는 거래정보를 건너뛰는지 확인합니다.</li></ol>
+        <div class="expected">예상: 39개 시나리오가 품목부터 이후 단계까지 자동 입력됨. 한 인보이스 안의 품목별 서로 다른 단일 유형, 복수 유형 후보 중 품목당 1개 선택, 해당 없음 혼합, 출시 전 소비자 통신제품, 의료·전시·수리 추가질문 아니오와 기존 판정·거래·오류 경로를 재현할 수 있음</div>
       </article>
     </div>
-    <div class="toolbar"><div class="progress" id="progress">0 / 14 완료</div><a class="btn" href="index.html" target="_blank" rel="noopener">앱 다시 열기</a></div>
+    <div class="toolbar"><div class="progress" id="progress">0 / 14 완료</div><a class="btn" href="index.html?admin=1" target="_blank" rel="noopener">관리자 앱 다시 열기</a></div>
   </section>
   <div class="footer">러시아·벨라루스 수출 점검 · 로컬 기능 테스트 환경</div>
 </main>
 <script>
 (function(){
-  const assets=['index.html','data/self_classification.csv','data/expert_classification.csv','data/csl_names.csv'];
+  const assets=['index.html'];
   const list=document.getElementById('asset-list');
   const server=document.getElementById('server-status');
   const assetStatus=document.getElementById('asset-status');
