@@ -93,7 +93,20 @@ const S=value=>value==null?'':(value instanceof Date?fmtDate(value):String(value
 const F={model:row=>S(field(row,['모델명(설명)','모델명','model','Model'])),item:row=>S(field(row,['제품명','품목명','물품명','item'])),result:row=>S(field(row,['결과','판정결과','result'])),number:row=>S(field(row,['판정번호','number'])),detDate:row=>field(row,['판정일','detDate']),expiry:row=>S(field(row,['유효기한','유효기간','expiry'])),spec:row=>S(field(row,['규격','사양규격','사양 및 규격','spec'])),hs:row=>S(field(row,['HSKCD','HS코드','HS','hs','HSK']))};
 function field(object,aliases){for(const alias of aliases){if(object&&object[alias]!=null&&object[alias]!=='')return object[alias]}return''}
 function fmtDate(date){return date.getFullYear()+'-'+String(date.getMonth()+1).padStart(2,'0')+'-'+String(date.getDate()).padStart(2,'0')}
-function parseDate(value){if(value==null||value==='')return null;if(value instanceof Date&&!isNaN(value))return value;if(typeof value==='number'){const date=new Date(Math.round((value-25569)*86400*1000));return isNaN(date)?null:date}const source=String(value).trim().replace(/[./]/g,'-').replace(/\s+/g,'');const match=source.match(/^(\d{4})-(\d{1,2})-(\d{1,2})$/);if(match)return new Date(+match[1],+match[2]-1,+match[3]);const date=new Date(source);return isNaN(date)?null:date}
+function parseDate(value){
+  if(value==null||value==='')return null;
+  if(value instanceof Date)return isNaN(value)?null:new Date(value);
+  if(typeof value==='number'){
+    const date=new Date(Math.round((value-25569)*86400*1000));
+    return isNaN(date)?null:date;
+  }
+  const source=String(value).trim().replace(/[./]/g,'-').replace(/\s+/g,'');
+  const match=source.match(/^(\d{4})-(\d{1,2})-(\d{1,2})$/);
+  if(!match)return null;
+  const year=Number(match[1]),month=Number(match[2]),day=Number(match[3]);
+  const date=new Date(year,month-1,day);
+  return date.getFullYear()===year&&date.getMonth()===month-1&&date.getDate()===day?date:null;
+}
 function addYears(date,years){const result=new Date(date);result.setFullYear(result.getFullYear()+years);return result}
 function isHae(result){return /해당/.test(String(result||''))&&!/비해당/.test(String(result||''))}
 function note(type,html){return `<div class="note ${type||''}">${html}</div>`}
@@ -109,7 +122,7 @@ function renderDbBanner(){const element=document.getElementById('db-banner');if(
 async function loadAll(){renderDbBanner();await Promise.all(EMBEDDED_DB_KEYS.map(loadOne));rebuildModelIndex();renderDbBanner();return dbState}
 const dbReady=loadAll();
 function parseModels(text){const seen=new Set(),models=[];String(text||'').split(/[\r\n,]+/).map(value=>value.trim()).filter(Boolean).forEach(model=>{const key=normModel(model);if(!seen.has(key)){seen.add(key);models.push(model)}});return models}
-function lookupModel(model){const matches=modelIndex.get(normModel(model))||[];const hits=matches.map(({row,type})=>{const detDate=parseDate(F.detDate(row));const expiryDate=parseDate(F.expiry(row))||(detDate?addYears(detDate,2):null);const expiry=expiryDate?fmtDate(expiryDate):S(F.expiry(row));const expired=expiryDate?expiryDate<new Date(new Date().setHours(0,0,0,0)):false;return{model,item:F.item(row),hs:normHS(F.hs(row)),spec:F.spec(row),result:F.result(row),number:F.number(row),detDate:detDate?fmtDate(detDate):S(F.detDate(row)),expiry,type,isHae:isHae(F.result(row)),expired,row,found:true}});if(!hits.length)return{model,found:false};hits.sort((a,b)=>Number(a.expired)-Number(b.expired)||(b.type==='전문판정')-(a.type==='전문판정')||String(b.detDate).localeCompare(String(a.detDate)));hits[0].multi=hits.length>1;return hits[0]}
+function lookupModel(model){const matches=modelIndex.get(normModel(model))||[];const hits=matches.map(({row,type})=>{const rawDetDate=F.detDate(row),rawExpiry=F.expiry(row);const detDate=parseDate(rawDetDate),parsedExpiry=parseDate(rawExpiry);const expiryDate=parsedExpiry||(detDate?addYears(detDate,2):null);const dateInvalid=Boolean((S(rawDetDate)&&!detDate)||(S(rawExpiry)&&!parsedExpiry)||!expiryDate);const expiry=expiryDate?fmtDate(expiryDate):S(rawExpiry);const expired=expiryDate?expiryDate<new Date(new Date().setHours(0,0,0,0)):false;return{model,item:F.item(row),hs:normHS(F.hs(row)),spec:F.spec(row),result:F.result(row),number:F.number(row),detDate:detDate?fmtDate(detDate):S(rawDetDate),expiry,type,isHae:isHae(F.result(row)),expired,dateInvalid,row,found:true}});if(!hits.length)return{model,found:false};hits.sort((a,b)=>Number(a.dateInvalid)-Number(b.dateInvalid)||Number(a.expired)-Number(b.expired)||(b.type==='전문판정')-(a.type==='전문판정')||String(b.detDate).localeCompare(String(a.detDate)));hits[0].multi=hits.length>1;return hits[0]}
 </script>
 
 
@@ -207,6 +220,7 @@ function lookupModel(model){const matches=modelIndex.get(normModel(model))||[];c
     flags:Array(INDICATORS.length).fill(null),
     cslScreened:false,
     cslMatches:[],
+    draftEdits:{classify:null,prenotif:null},
     revision:0,
     reached:1,
     activeStep:1
@@ -229,6 +243,7 @@ function lookupModel(model){const matches=modelIndex.get(normModel(model))||[];c
   const CSL_THRESHOLD=.90;
   let cslRecords=[];
   let cslCandidates=[];
+  let cslCandidatesByLength=new Map();
   const cslState={status:'loading',error:''};
 
   function normalizeCslName(value){
@@ -265,36 +280,55 @@ function lookupModel(model){const matches=modelIndex.get(normModel(model))||[];c
       const rows=parseCSV(text);
       cslRecords=rows.map((row,index)=>({index,source:row.source||'-',name:row.name||'',altNames:String(row.alt_names||'').split(';').map(value=>value.trim()).filter(Boolean)})).filter(record=>record.name);
       cslCandidates=[];
+      cslCandidatesByLength=new Map();
       cslRecords.forEach((record,recordIndex)=>[record.name,...record.altNames].forEach(display=>{
         const normalized=normalizeCslName(display);
-        if(normalized)cslCandidates.push({recordIndex,display,normalized,sorted:sortedCslName(display)});
+        if(normalized){
+          const candidate={recordIndex,display,normalized,sorted:sortedCslName(display)};
+          cslCandidates.push(candidate);
+          const sameLength=cslCandidatesByLength.get(normalized.length)||[];
+          sameLength.push(candidate);
+          cslCandidatesByLength.set(normalized.length,sameLength);
+        }
       }));
       if(!cslCandidates.length)throw new Error('CSL 이름 자료가 비어 있습니다.');
       cslState.status='ready';
       return cslState;
     }catch(error){
-      cslRecords=[];cslCandidates=[];cslState.status='error';cslState.error=error instanceof Error?error.message:String(error);return cslState;
+      cslRecords=[];cslCandidates=[];cslCandidatesByLength=new Map();cslState.status='error';cslState.error=error instanceof Error?error.message:String(error);return cslState;
     }
   }
   const cslReady=loadCslData();
   const cslSearchCache=new Map();
-  function searchCslName(value){
+  async function searchCslName(value){
     const query=normalizeCslName(value);
     if(!query)return[];
-    if(cslSearchCache.has(query))return cslSearchCache.get(query);
+    if(cslSearchCache.has(query))return await cslSearchCache.get(query);
     const sortedQuery=sortedCslName(value);
-    const bestByRecord=new Map();
-    for(const candidate of cslCandidates){
-      const ratio=Math.min(query.length,candidate.normalized.length)/Math.max(query.length,candidate.normalized.length);
-      if(ratio<.6)continue;
-      const score=Math.max(jaroWinkler(query,candidate.normalized),jaroWinkler(sortedQuery,candidate.sorted));
-      if(score<CSL_THRESHOLD)continue;
-      const previous=bestByRecord.get(candidate.recordIndex);
-      if(!previous||score>previous.score)bestByRecord.set(candidate.recordIndex,{score,matchedName:candidate.display});
+    const task=(async()=>{
+      const bestByRecord=new Map();
+      const minimumLength=Math.max(1,Math.ceil(query.length*.6));
+      const maximumLength=Math.floor(query.length/.6);
+      let processed=0;
+      for(let length=minimumLength;length<=maximumLength;length++)for(const candidate of cslCandidatesByLength.get(length)||[]){
+        const score=Math.max(jaroWinkler(query,candidate.normalized),jaroWinkler(sortedQuery,candidate.sorted));
+        if(score>=CSL_THRESHOLD){
+          const previous=bestByRecord.get(candidate.recordIndex);
+          if(!previous||score>previous.score)bestByRecord.set(candidate.recordIndex,{score,matchedName:candidate.display});
+        }
+        if(++processed%2000===0)await new Promise(resolve=>setTimeout(resolve,0));
+      }
+      return [...bestByRecord.entries()].map(([recordIndex,match])=>({...cslRecords[recordIndex],...match,scorePercent:Math.round(match.score*1000)/10})).sort((a,b)=>b.score-a.score).slice(0,3);
+    })();
+    cslSearchCache.set(query,task);
+    try{
+      const results=await task;
+      cslSearchCache.set(query,results);
+      return results;
+    }catch(error){
+      cslSearchCache.delete(query);
+      throw error;
     }
-    const results=[...bestByRecord.entries()].map(([recordIndex,match])=>({...cslRecords[recordIndex],...match,scorePercent:Math.round(match.score*1000)/10})).sort((a,b)=>b.score-a.score).slice(0,3);
-    cslSearchCache.set(query,results);
-    return results;
   }
 
   function showFlowMessage(message){
@@ -306,6 +340,7 @@ function lookupModel(model){const matches=modelIndex.get(normModel(model))||[];c
 
   function clearReviewOutputs(){
     ['nf-ai-summary','nf-document-output'].forEach(id=>document.getElementById(id)?.replaceChildren());
+    flowState.draftEdits={classify:null,prenotif:null};
   }
   function setFinalStepPresentation(inquiryRequired){
     document.getElementById('nf-stepper-5').textContent=inquiryRequired?'통상그룹 문의':'품의 초안';
@@ -387,7 +422,8 @@ function lookupModel(model){const matches=modelIndex.get(normModel(model))||[];c
   function needsJudgment(item){
     const found=item?.lookup?.found??item?.found;
     const expired=item?.lookup?.expired??item?.expired;
-    return Boolean(item?.model)&&(item.sanction==='검토대상'||found===false||expired===true);
+    const dateInvalid=item?.lookup?.dateInvalid??item?.dateInvalid;
+    return Boolean(item?.model)&&(item.sanction==='검토대상'||found===false||expired===true||dateInvalid===true);
   }
   function needsJudgmentRoute(){return flowState.models.some(needsJudgment)}
   function duplicateFlowModels(){
@@ -399,12 +435,14 @@ function lookupModel(model){const matches=modelIndex.get(normModel(model))||[];c
     const reasons=[];
     const found=item?.lookup?.found??item?.found;
     const expired=item?.lookup?.expired??item?.expired;
+    const dateInvalid=item?.lookup?.dateInvalid??item?.dateInvalid;
     if(item.sanction==='검토대상')reasons.push('제재 HS 미매칭 검토대상');
     if(found===false)reasons.push('판정 DB 미등록');
     if(expired===true){
       const expiredNumber=item?.lookup?.number||item?.number||item?.manualNumber||'';
       reasons.push(expiredNumber?`판정 유효기간 만료 (만료 판정번호: ${expiredNumber})`:'판정 유효기간 만료');
     }
+    if(dateInvalid===true)reasons.push('판정일 또는 유효기간 확인 필요');
     return reasons;
   }
   function sanctionTone(value){return value==='제재대상'?'clear':'pending'}
@@ -414,7 +452,7 @@ function lookupModel(model){const matches=modelIndex.get(normModel(model))||[];c
     if(item.model&&item.item&&/^\d{6,10}$/.test(item.hs))return '품목 확인이 완료되었습니다. 다음 버튼을 눌러 주세요.';
     return '모델명과 품목 정보를 입력해 주세요.';
   }
-  function statusText(L){if(!L||!L.model)return '조회 전';if(!L.found)return '판정정보 없음';if(L.expired)return '만료 · 재판정 필요';return L.isHae?'유효 · 해당':'유효 · 비해당'}
+  function statusText(L){if(!L||!L.model)return '조회 전';if(!L.found)return '판정정보 없음';if(L.dateInvalid)return '판정일·유효기간 확인 필요';if(L.expired)return '만료 · 재판정 필요';return L.isHae?'유효 · 해당':'유효 · 비해당'}
   function renderFlowDbNotice(){
     const box=document.getElementById('nf-step1-msg');
     const message=dbReadinessMessage(FLOW_REQUIRED_DB_KEYS);
@@ -439,7 +477,7 @@ function lookupModel(model){const matches=modelIndex.get(normModel(model))||[];c
     const model=String(rawModel||'').trim();
     const sample=sampleFor(model);
     const lookup=model&&areDbsReady(['self','expert'])?lookupModel(model):null;
-    const source=sample||(lookup?.found?lookup:null);
+    const source=(lookup?.found?lookup:null)||sample;
     item.model=model;
     item.item=source?.item||'';
     item.hs=normHS(source?.hs||'');
@@ -513,8 +551,8 @@ function lookupModel(model){const matches=modelIndex.get(normModel(model))||[];c
       const key=normModel(model);
       if(key&&!options.has(key))options.set(key,{model:String(model).trim(),item:String(item||'').trim(),hs:normHS(hs)});
     };
-    SANCTION_SAMPLE_DB.forEach(row=>add(row.model,row.item,row.hs));
     [...DB.self,...DB.expert].forEach(row=>add(F.model(row),F.item(row),F.hs(row)));
+    SANCTION_SAMPLE_DB.forEach(row=>add(row.model,row.item,row.hs));
     return [...options.values()].sort((a,b)=>a.model.localeCompare(b.model,'ko'));
   }
 
@@ -1060,8 +1098,8 @@ function lookupModel(model){const matches=modelIndex.get(normModel(model))||[];c
     for(const [invoiceIndex,invoice] of (flowState.pre.invoices||[]).entries())for(const [role,roleLabel] of Object.entries(roleLabels)){
       const input=invoice[role];
       if(RUSSIA_TRADERS.includes(String(input||'').trim().toUpperCase()))continue;
-      if(!cslSearchCache.has(normalizeCslName(input)))await new Promise(resolve=>setTimeout(resolve,0));
-      searchCslName(input).forEach(result=>matches.push({...result,invoice:invoiceIndex+1,invoiceNo:invoice.no,role,roleLabel,input}));
+      const results=await searchCslName(input);
+      results.forEach(result=>matches.push({...result,invoice:invoiceIndex+1,invoiceNo:invoice.no,role,roleLabel,input}));
     }
     return matches.sort((a,b)=>b.score-a.score);
   }
@@ -1072,7 +1110,7 @@ function lookupModel(model){const matches=modelIndex.get(normModel(model))||[];c
     if(cslState.status==='error'){box.innerHTML=note('danger','<b>CSL 자료를 불러오지 못했습니다.</b><br>거래자 확인이 완료되지 않아 다음 단계로 진행할 수 없습니다.');return}
     if(!flowState.cslScreened){box.innerHTML=note('info',`CSL 우려거래자 자동 확인 준비 완료 · 기준 ${CSL_DATA_DATE}`);return}
     if(!flowState.cslMatches.length){box.innerHTML=note('ok','구매자·최종수하인·최종사용자에서 CSL 90점 이상 일치 결과가 없습니다.');return}
-    box.innerHTML=note('danger',`<b>CSL 90점 이상 유사 일치 ${flowState.cslMatches.length}건</b><br>결과보고서를 첨부하여 통상그룹에 문의해야 합니다.<div class="csl-match-list">${flowState.cslMatches.map(match=>`<div class="csl-match"><strong>${esc(match.roleLabel)}: ${esc(match.input)} → ${esc(match.matchedName)}</strong><div class="csl-match-meta">등재명 ${esc(match.name)} · 점수 ${match.scorePercent} · ${esc(match.source)} · 인보이스 ${match.invoice}${match.invoiceNo?` (${esc(match.invoiceNo)})`:''}</div></div>`).join('')}</div>`);
+    box.innerHTML=note('warn',`<b>CSL 90점 이상 유사 일치 ${flowState.cslMatches.length}건</b><br>일치 여부를 품의 초안에 표시하여 진행합니다. 상세 일치정보는 결과보고서에서 확인하세요.<div class="csl-match-list">${flowState.cslMatches.map(match=>`<div class="csl-match"><strong>${esc(match.roleLabel)}: ${esc(match.input)} → ${esc(match.matchedName)}</strong><div class="csl-match-meta">등재명 ${esc(match.name)} · 점수 ${match.scorePercent} · ${esc(match.source)} · 인보이스 ${match.invoice}${match.invoiceNo?` (${esc(match.invoiceNo)})`:''}</div></div>`).join('')}</div>`);
   }
 
   document.getElementById('nf-back-2').onclick=()=>showFlow(1);
@@ -1184,7 +1222,7 @@ function lookupModel(model){const matches=modelIndex.get(normModel(model))||[];c
     if(flowState.cslScreened)flowState.flags[12]=flowState.cslMatches.length>0;
     if(autoMode)flowState.flags=flowState.flags.map((value,index)=>index===10||index===12?value:false);
     document.getElementById('nf-back-3').textContent=needsJudgmentRoute()?'← 수출품목 수정':'← 거래정보 수정';
-    const cslNotice=flowState.cslMatches.length?note('danger',`<b>CSL 90점 이상 유사 일치가 발견되었습니다.</b><br>13번은 ‘예’로 자동 처리됩니다. 확인 질문을 마친 뒤 결과보고서를 첨부하여 통상그룹에 문의하세요.`):'';
+    const cslNotice=flowState.cslMatches.length?note('warn',`<b>CSL 90점 이상 유사 일치가 발견되었습니다.</b><br>13번은 ‘예’로 자동 처리됩니다. 나머지 질문을 확인한 뒤 품의 초안으로 진행하세요. 상세 일치정보는 결과보고서에 표시됩니다.`):'';
     const questionCard=(text,index)=>{
       const cslAuto=index===12&&flowState.cslScreened;
       return `<div class="flag-card ${cslAuto?'auto-checked':''}"><div class="flag-text"><b>#${index+1}</b>${esc(text)}${cslAuto?`<div class="csl-auto">CSL 자동 확인: ${flowState.flags[index]?'예':'아니오'}</div>`:''}</div><div class="radio-pair"><label class="radio-chip yes ${flowState.flags[index]===true?'on':''}"><input type="radio" name="nf-flag-${index}" value="yes" ${flowState.flags[index]===true?'checked':''} ${cslAuto?'disabled':''}> 예</label><label class="radio-chip ${flowState.flags[index]===false?'on':''}"><input type="radio" name="nf-flag-${index}" value="no" ${flowState.flags[index]===false?'checked':''} ${cslAuto?'disabled':''}> 아니오</label></div></div>`;
@@ -1429,7 +1467,27 @@ function lookupModel(model){const matches=modelIndex.get(normModel(model))||[];c
   function draftHtml(kind,draft){
     if(!draft)return '';
     const key=kind==='판정'?'classify':'prenotif';
-    return `<h4>${kind} 요청 품의 초안</h4><div class="hint">표를 포함한 본문을 바탕체 12포인트로 직접 수정하거나 복사할 수 있습니다.</div><label class="fld" style="margin-top:12px">제목</label><input class="draft-title" id="nf-${key}-title" value="${esc(draft.title)}"><label class="fld" style="margin-top:12px">본문</label><div class="draft-rich" id="nf-${key}-body" contenteditable="true" role="textbox" aria-multiline="true"><div style="font-family:'Batang','바탕',serif;font-size:12pt;line-height:1.6">${draft.html}</div></div><div class="copy-row"><button class="btn sm" data-copy-target="nf-${key}-title" type="button">제목 복사</button><button class="btn primary sm" data-copy-target="nf-${key}-body" type="button">본문·표 복사</button></div>`;
+    const edited=flowState.draftEdits[key];
+    const title=edited?.title??draft.title;
+    const bodyHtml=edited?sanitizeDraftHtml(edited.html):`<div style="font-family:'Batang','바탕',serif;font-size:12pt;line-height:1.6">${draft.html}</div>`;
+    return `<h4>${kind} 요청 품의 초안</h4><div class="hint">표를 포함한 본문을 바탕체 12포인트로 직접 수정하거나 복사할 수 있습니다. 수정 내용은 상위 입력이 바뀌기 전까지 유지됩니다.</div><label class="fld" style="margin-top:12px">제목</label><input class="draft-title" id="nf-${key}-title" data-draft-key="${key}" value="${esc(title)}"><label class="fld" style="margin-top:12px">본문</label><div class="draft-rich" id="nf-${key}-body" data-draft-key="${key}" contenteditable="true" role="textbox" aria-multiline="true">${bodyHtml}</div><div class="copy-row"><button class="btn sm" data-copy-target="nf-${key}-title" type="button">제목 복사</button><button class="btn primary sm" data-copy-target="nf-${key}-body" type="button">본문·표 복사</button></div>`;
+  }
+
+  function sanitizeDraftHtml(html){
+    const template=document.createElement('template');
+    template.innerHTML=String(html||'');
+    template.content.querySelectorAll('script,style,iframe,object,embed,link,meta,base,form,input,button,textarea,select,img,svg,math,video,audio,source').forEach(element=>element.remove());
+    template.content.querySelectorAll('*').forEach(element=>[...element.attributes].forEach(attribute=>{
+      const name=attribute.name.toLowerCase(),value=attribute.value.trim().toLowerCase();
+      if(name.startsWith('on')||((name==='href'||name==='src')&&(value.startsWith('javascript:')||value.startsWith('data:'))))element.removeAttribute(attribute.name);
+    }));
+    return template.innerHTML;
+  }
+
+  function currentDraft(key,draft){
+    if(!draft)return null;
+    const edited=flowState.draftEdits[key];
+    return edited?{...draft,title:edited.title,html:sanitizeDraftHtml(edited.html)}:draft;
   }
 
   async function copyDraftElement(element){
@@ -1456,6 +1514,12 @@ function lookupModel(model){const matches=modelIndex.get(normModel(model))||[];c
     const classify=classifyDraft();
     const prenotif=prenotifDraft();
     output.innerHTML=result.inquiryRequired?note('danger','<b>품의를 진행하지 마세요.</b><br>결과보고서(.html)를 다운로드하여 첨부한 뒤 통상그룹에 문의해 주세요.'):classify?draftHtml('판정',classify):prenotif?draftHtml('사전신고',prenotif):note('info','품의 대상이 없습니다. 결과보고서(.html)를 저장해 통상그룹에 전달해 주세요.');
+    output.querySelectorAll('[data-draft-key]').forEach(element=>element.oninput=()=>{
+      const key=element.dataset.draftKey;
+      const title=document.getElementById(`nf-${key}-title`);
+      const body=document.getElementById(`nf-${key}-body`);
+      if(title&&body)flowState.draftEdits[key]={title:title.value,html:body.innerHTML};
+    });
     document.querySelectorAll('[data-copy-target]').forEach(button=>button.onclick=async()=>{
       const element=document.getElementById(button.dataset.copyTarget);
       if(!await copyDraftElement(element)){showFlowMessage('자동 복사에 실패했습니다. 내용을 직접 복사하세요.');return}
@@ -1469,8 +1533,8 @@ function lookupModel(model){const matches=modelIndex.get(normModel(model))||[];c
 
   function reviewReportHtml(){
     const result=reviewData();
-    const classify=classifyDraft();
-    const prenotif=prenotifDraft();
+    const classify=currentDraft('classify',classifyDraft());
+    const prenotif=currentDraft('prenotif',prenotifDraft());
     const rows=result.models.map(model=>`<tr><td>${esc(model.model)}</td><td>${esc(model.item)}</td><td>${esc(model.hs||'-')}</td><td>${esc(model.number||'-')}</td><td>${esc(model.sanction)}</td><td>${esc(statusText(model))}</td><td>${esc(model.spec||'-')}</td><td>${esc(model.purpose||'-')}</td></tr>`).join('');
     const flags=result.flagsSkipped?'<p>통상그룹 문의가 필요한 건으로 안내했습니다.</p>':`<ol>${INDICATORS.map((text,index)=>`<li>[${flowState.flags[index]?'예':'아니오'}] ${esc(text)}</li>`).join('')}</ol>`;
     const keywordReport=result.keywordHits.length?`<h3>확인 키워드</h3><table><tr><th>인보이스</th><th>입력 항목</th><th>발견 키워드</th><th>입력 내용</th></tr>${result.keywordHits.map(hit=>`<tr><td>${hit.invoice}${hit.no?` · ${esc(hit.no)}`:''}</td><td>${esc(hit.field)}</td><td>${esc(hit.keyword)}</td><td>${esc(hit.value)}</td></tr>`).join('')}</table>`:'<p>확인 키워드 없음</p>';
