@@ -61,7 +61,7 @@ function Start-TestServer {
   $listener = [System.Net.Sockets.TcpListener]::new([Net.IPAddress]::Loopback, $SelectedPort)
   $listener.Start()
 
-  $testUrl = "http://127.0.0.1:$SelectedPort/test-environment.html"
+  $testUrl = "http://127.0.0.1:$SelectedPort/index.html?admin=1"
   Write-Host ''
   if ($SelectedPort -ne $requestedPort) {
     Write-Host "Port $requestedPort is busy. Using port $SelectedPort instead." -ForegroundColor Yellow
@@ -120,7 +120,7 @@ function Start-TestServer {
 
         $rawPath = ($parts[1] -split '\?', 2)[0]
         $relative = [Uri]::UnescapeDataString($rawPath).TrimStart('/')
-        if ([string]::IsNullOrWhiteSpace($relative)) { $relative = 'test-environment.html' }
+        if ([string]::IsNullOrWhiteSpace($relative)) { $relative = 'index.html' }
         $relative = $relative.Replace('/', [IO.Path]::DirectorySeparatorChar)
         $target = [IO.Path]::GetFullPath((Join-Path $root $relative))
         $insideRoot = $target -eq $root -or $target.StartsWith($rootPrefix, [StringComparison]::OrdinalIgnoreCase)

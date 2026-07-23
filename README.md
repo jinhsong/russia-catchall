@@ -11,7 +11,6 @@
 - 배포 화면: <https://jinhsong.github.io/russia-catchall/>
 - 일반 로컬 실행: `index.html`
 - 관리자 테스트: `index.html?admin=1`
-- 수동 테스트 대시보드: `test-environment.html`
 
 ## 주요 특징
 
@@ -330,7 +329,7 @@ Windows에서 `start-test-server.bat`를 더블클릭합니다.
 기본 주소는 다음과 같습니다.
 
 ```text
-http://127.0.0.1:8765/test-environment.html
+http://127.0.0.1:8765/index.html?admin=1
 ```
 
 8765 포트가 사용 중이면 8766부터 사용 가능한 포트를 자동 선택하며, 실제 주소는 서버 창의 `Test URL`에 표시됩니다.
@@ -374,14 +373,13 @@ index.html?admin=1
 
 `?admin=1`은 화면 노출을 구분하는 기능일 뿐 인증이나 접근통제가 아닙니다. 테스트 데이터는 실제 판정이나 거래에 사용하면 안 됩니다.
 
-수동 회귀검사는 `test-environment.html`의 체크리스트를 사용합니다.
+수동 회귀검사도 별도 HTML 없이 관리자 URL에서 시나리오별로 수행합니다.
 
 ## 저장소 구조
 
 ```text
 russia-catchall/
 ├─ index.html                    # 배포 대상 단일 HTML 앱과 내장 DB
-├─ test-environment.html         # 수동 회귀 테스트 대시보드
 ├─ start-test-server.bat         # Windows 테스트 서버 실행
 ├─ start-test-server.ps1         # 로컬 HTTP 서버
 ├─ data/                         # DB 갱신용 원본·참고 CSV
@@ -433,7 +431,7 @@ CSV 원본의 주요 헤더는 다음과 같습니다.
 4. `index.html`의 해당 내장 상수를 교체합니다.
 5. CSL 갱신이면 `CSL_DATA_DATE`를 변경합니다.
 6. 일반 주소에서 관리자 시나리오가 숨겨지는지 확인합니다.
-7. `index.html?admin=1`의 시나리오와 `test-environment.html` 체크리스트를 수행합니다.
+7. `index.html?admin=1`의 시나리오를 수행합니다.
 8. 결과보고서와 품의 초안의 표·첨부·서식을 확인합니다.
 
 현재 별도의 자동 임베드 빌드 스크립트는 저장소에 포함되어 있지 않습니다. DB를 갱신할 때는 원본 CSV만 교체하지 말고 내장 payload까지 함께 갱신해야 합니다.
@@ -443,7 +441,7 @@ CSV 원본의 주요 헤더는 다음과 같습니다.
 GitHub Pages는 `main` 브랜치의 루트에서 배포합니다.
 
 1. 변경사항을 검증합니다.
-2. `index.html`, `test-environment.html`, `README.md` 등 필요한 파일만 커밋합니다.
+2. 실행 화면 변경은 `index.html`에 통합하고 필요한 문서·스크립트만 함께 커밋합니다.
 3. `main`에 푸시합니다.
 4. GitHub Actions와 Pages 배포 상태를 확인합니다.
 5. 배포 주소에서 캐시를 무시하고 새로고침합니다.
